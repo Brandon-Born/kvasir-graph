@@ -99,7 +99,7 @@ function renderPlot(){
     const x=G.clamp(X(p.x)+offset.x,10,887),y=G.clamp(Y(p.y)+offset.y,18,498);
     txt(labels,o.caption??o.name,x,y,{'font-size':o.kind==='region'?18:20,'font-style':'italic','font-weight':isCurve?600:400,
       'text-anchor':o.kind==='region'?'middle':x>795&&(o.caption??o.name).length>4?'end':'start',
-      fill:o.kind==='region'?M.ink:color(o),'data-id':o.id,'data-label':'1','paint-order':'stroke',stroke:'white','stroke-width':o.kind==='region'?0:3});
+      fill:o.kind==='region'?M.ink:color(o),'data-id':o.id,'data-label':'1','pointer-events':'bounding-box','paint-order':'stroke',stroke:'white','stroke-width':o.kind==='region'?0:3});
   }
   const overlay=svg('g',{class:'editor-only','pointer-events':'none',id:'overlay'});
   const obj=scene.resolved.get(selected);
@@ -138,6 +138,7 @@ function render(){
   const o=selectedObj(),ins=$('inspector');ins.replaceChildren();
   if(o){
     ins.append(btn('Edit',()=>editObject(o)));
+    if(o.kind!=='label'&&(o.kind!=='guide'||o.showLabel))ins.append(btn('Move label',()=>setTool('Move label')));
     if(['line','u','free','guide'].includes(o.kind))ins.append(btn('Copy & shift',()=>shiftDialog(o)));
     if(o.kind==='region')ins.append(btn('Add area',()=>{setTool('Shade');shadeGroup=o.id;$('hint').textContent='Click another area to include in '+o.name+'.';}));
     if(o.pts.some(p=>p.ref))ins.append(btn('Detach',()=>commit(()=>{o.pts=scene.resolved.get(o.id).pts.map(({x,y})=>({x,y}));})));
@@ -153,11 +154,15 @@ function render(){
   if(tool==='Guide')for(const [k,v] of [['auto','Any angle'],['h','Horizontal'],['v','Vertical']])opts.append(btn(v,()=>{guideMode=k;setTool('Guide');},guideMode===k?'active':''));
   if(tool==='Label')for(const [k,v] of [['object','Object label'],['text','Free text']])opts.append(btn(v,()=>{labelMode=k;setTool('Label');},labelMode===k?'active':''));
   $('hint').textContent=start?'Click the second endpoint. Esc cancels.':tool==='Draw'&&drawMode==='u'?'Click to place the minimum. Drag either arm to reshape.':tool==='Draw'&&drawMode==='free'?'Drag to sketch a smooth curve.':hints[tool];
+  if(tool==='Move label')$('hint').textContent='Click where the label should appear. Esc cancels.';
+  plot.style.cursor=tool==='Move label'?'crosshair':'';
   renderPlot();
 }
-function position(event){
+function graphPosition(x,y){return {x:(x-box.x)*graph().xmax/box.w,y:(box.y+box.h-y)*graph().ymax/box.h};}
+function position(event,keepMargins=false){
   const p=new DOMPoint(event.clientX,event.clientY).matrixTransform(plot.getScreenCTM().inverse());
-  return {x:G.clamp((p.x-box.x)*graph().xmax/box.w,0,graph().xmax),y:G.clamp((box.y+box.h-p.y)*graph().ymax/box.h,0,graph().ymax)};
+  const pos=graphPosition(p.x,p.y);
+  return keepMargins?pos:{x:G.clamp(pos.x,0,graph().xmax),y:G.clamp(pos.y,0,graph().ymax)};
 }
 const tolerance=()=>10/(plot.getScreenCTM()?.a||1);
 function pathParameter(path,p){
@@ -208,6 +213,7 @@ function snap(raw,event,exclude=null){
 }
 function hit(event,p){
   const direct=event.target.closest('[data-id]')?.dataset.id;
+  if(event.target.closest('[data-label]'))return direct;
   if(direct&&scene.resolved.get(direct)?.kind!=='region')return direct;
   let best=null,dist=tolerance();
   for(const o of scene.resolved.values()){
@@ -248,13 +254,24 @@ function interior(f){
 function nextName(base){let i=1;const names=new Set(graph().objects.map(o=>o.name));while(names.has(base+' '+i))i++;return base+' '+i;}
 function newColor(){const colors=[M.teal,M.orange,'#556bb1','#9660a7'];return colors[graph().objects.filter(o=>['line','free','u'].includes(o.kind)).length%colors.length];}
 plot.onpointerdown=event=>{
-  if(event.button!==0||drag)return;getScene();const raw=position(event),id=hit(event,raw),g=graph();
+  if(event.button!==0||drag)return;
+  getScene();
+  if(tool==='Move label'){
+    const obj=selectedObj();
+    if(obj)commit(()=>{obj.labelAt=position(event,true);tool='Select';});
+    return;
+  }
+  const raw=position(event,tool==='Select'),id=hit(event,raw),g=graph();
   if(tool==='Select'){
-    const active=scene.resolved.get(selected),idx=active?.kind==='free'?-1:active?.pts.findIndex(p=>distance(p,raw)<tolerance());
+    const text=event.target.closest('text[data-label]'),active=scene.resolved.get(selected);
+    const otherPoint=id!==selected&&event.target.closest('circle[data-id]');
+    const idx=text||otherPoint||active?.kind==='free'?-1:active?.pts.findIndex(p=>distance(p,raw)<tolerance());
     if(idx>=0||id){
       selected=idx>=0?selected:id;const obj=scene.resolved.get(selected);
-      const label=idx>=0?false:!!event.target.closest('[data-label]')&&obj.kind!=='label';
-      drag={type:idx>=0?'handle':label?'caption':'move',idx,raw,snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
+      const label=text&&obj.kind!=='label';
+      const labelOrigin=label?graphPosition(Number(text.getAttribute('x')),Number(text.getAttribute('y'))):null;
+      const type=idx>=0?'handle':label||obj.kind==='region'?'caption':'move';
+      drag={type,idx,labelOrigin,raw:type==='caption'?raw:position(event),snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
       plot.setPointerCapture(event.pointerId);
     }else selected=null;
     render();return;
@@ -289,7 +306,7 @@ plot.onpointerdown=event=>{
   addShape(o);
 };
 plot.onpointermove=event=>{
-  const raw=position(event);$('coords').textContent='Q '+num(raw.x)+'   ·   P '+num(raw.y);
+  const raw=position(event,drag?.type==='caption');$('coords').textContent='Q '+num(raw.x)+'   ·   P '+num(raw.y);
   if(drag?.type==='free'){
     if(distance(raw,drag.pts.at(-1))>5&&drag.pts.length<320)drag.pts.push(raw);
     renderPreview();return;
@@ -298,7 +315,7 @@ plot.onpointermove=event=>{
     if(!drag.moved&&distance(raw,drag.raw)<2)return;drag.moved=true;
     const o=selectedObj(),dx=raw.x-drag.raw.x,dy=raw.y-drag.raw.y,base=drag.base;
     if(drag.type==='caption'||o.kind==='region'){
-      const initial=base.labelAt||labelPosition(base)||drag.raw;
+      const initial=drag.labelOrigin||base.labelAt||labelPosition(base)||drag.raw;
       o.labelAt={x:initial.x+dx,y:initial.y+dy};
     }else if(drag.type==='handle'||['point','label'].includes(o.kind)){
       const i=drag.idx>=0?drag.idx:0,p=snap(raw,event,o.id);hover=p;
@@ -313,8 +330,9 @@ plot.onpointermove=event=>{
     }
     cache=null;renderPlot();return;
   }
-  hover=tool==='Select'||tool==='Shade'?raw:snap(raw,event);
-  if(tool==='Select'||tool==='Shade')snapText='';
+  const showSnap=!['Select','Shade','Move label'].includes(tool);
+  hover=showSnap?snap(raw,event):raw;
+  if(!showSnap)snapText='';
   if(snapText)$('coords').textContent='Q '+num(hover.x)+'   ·   P '+num(hover.y);
   renderPreview();
 };
@@ -428,7 +446,7 @@ function deleteSelected(){
       for(const r of graph().objects.filter(k=>k.kind==='region'))r.pieces=r.pieces.filter(p=>!p.signature.split('|').includes(o.id));
       graph().objects=graph().objects.filter(k=>k.kind!=='region'||k.pieces.length);
     }
-    selected=null;
+    selected=null;if(tool==='Move label')tool='Select';
   });
 }
 function menu(title,items){
