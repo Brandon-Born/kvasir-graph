@@ -5,4 +5,7 @@
 .pair[hidden]{display:none}.range-preview:not(:empty){display:block;padding:9px 12px;border-radius:6px;background:var(--soft);font-size:14px}
 .label-field{display:grid;grid-template-columns:minmax(0,1fr) 65px auto;align-items:end;gap:8px}
 .subscript-button{margin-bottom:10px;font-size:14px;color:var(--teal);white-space:nowrap}
+#object-menu{position:fixed;inset:auto;margin:0;padding:4px;min-width:160px;max-height:calc(100vh - 12px);overflow:auto;border:1px solid var(--line);border-radius:8px;background:white;box-shadow:0 5px 20px #21393627;color:var(--ink)}
+#object-menu button{display:block;width:100%;border:0;text-align:left;background:transparent}
+#object-menu button:hover,#object-menu button:focus-visible{background:var(--soft);outline-offset:-2px}
 .label-preview:not([hidden]){display:block;color:var(--ink);background:#f2f7f7;padding:6px 10px;border-radius:5px;font:italic 19px var(--serif);overflow-wrap:anywhere}

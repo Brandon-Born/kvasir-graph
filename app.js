@@ -88,12 +88,12 @@ function renderPlot(){
       svg('path',{d:pathData(scene.paths.get(o.id)),fill:'none',stroke:color(o),'stroke-width':o.kind==='guide'?1.6:3,'stroke-linecap':'round','stroke-linejoin':'round','stroke-dasharray':o.kind==='guide'?'7 6':'none'},strokes);
     }
   }
-  const axis=svg('g',{},labels);
+  const axis=svg('g',{'data-axes':'1'},labels);
   svg('path',{d:'M76 35V455H846',fill:'none',stroke:M.ink,'stroke-width':1.8},axis);
   svg('path',{d:'m76 32-4 9h8z M848 455l-9-4v8z',fill:M.ink},axis);
   const ySize=fontSize(g.yFontSize,19);
-  txt(labels,g.ylabel,box.x-4,Math.max(24,ySize),{'font-style':'italic','font-size':ySize});
-  txt(labels,g.xlabel,850,509,{'text-anchor':'end','font-style':'italic','font-size':fontSize(g.xFontSize,19)});
+  txt(axis,g.ylabel,box.x-4,Math.max(24,ySize),{'font-style':'italic','font-size':ySize});
+  txt(axis,g.xlabel,850,509,{'text-anchor':'end','font-style':'italic','font-size':fontSize(g.xFontSize,19)});
   for(const o of scene.resolved.values()){
     if(o.kind==='point'){const p=scaled(o.pts[0]);svg('circle',{cx:p.x,cy:p.y,r:5.6,fill:color(o),stroke:'white','stroke-width':2,'data-id':o.id},labels);}
     if(o.kind==='guide'&&!o.showLabel)continue;
@@ -111,10 +111,14 @@ function renderPlot(){
       else if(bounds.x+bounds.width>896)caption.setAttribute('x',x-Math.min(bounds.x-4,bounds.x+bounds.width-896));
     }
   }
-  const overlay=svg('g',{class:'editor-only','pointer-events':'none',id:'overlay'});
+  svg('g',{class:'editor-only','pointer-events':'none',id:'overlay'});
+  renderHandles();
+  renderPreview();
+}
+function renderHandles(){
+  const overlay=$('overlay');overlay.replaceChildren();
   const obj=scene.resolved.get(selected);
   if(tool==='Select'&&obj&&obj.kind!=='free')obj.pts.forEach(p=>svg('circle',{cx:X(p.x),cy:Y(p.y),r:5,fill:'white',stroke:M.teal,'stroke-width':2},overlay));
-  renderPreview();
 }
 function renderPreview(){
   $('preview')?.remove();
@@ -132,28 +136,62 @@ function renderPreview(){
 }
 const hints={Select:'Select an object to edit it. Drag a label to reposition it.',Draw:'Click two endpoints, or enter exact coordinates.',Point:'Click to mark a point. Hold Alt to pause snapping.',Guide:'Click a starting point, then the end of your guide.',Shade:'Click inside a bounded area to shade it.',Label:'Click a curve or area to name it, or click empty space to add text.'};
 const faceAt=p=>faces.filter(f=>G.inside(p,f.poly)).sort((a,b)=>a.area-b.area)[0];
-function setTool(name){tool=name;start=null;hover=null;drag=null;snapText='';shadeGroup=null;render();}
-function render(){
+function setTool(name,keepObjectRows=false){tool=name;start=null;hover=null;drag=null;snapText='';shadeGroup=null;render(keepObjectRows);}
+function objectActions(o){
+  const actions=[['Edit',()=>editObject(o)]];
+  if(o.kind!=='label'&&(o.kind!=='guide'||o.showLabel))actions.push(['Move label',()=>setTool('Move label')]);
+  if(['line','u','free','guide'].includes(o.kind))actions.push(['Copy & shift',()=>shiftDialog(o)]);
+  if(o.kind==='region')actions.push(['Add area',()=>{setTool('Shade');shadeGroup=o.id;$('hint').textContent='Click another area to include in '+o.name+'.';}]);
+  if(o.pts.some(p=>p.ref))actions.push(['Detach',()=>commit(()=>{o.pts=scene.resolved.get(o.id).pts.map(({x,y})=>({x,y}));})]);
+  actions.push(['Delete',deleteSelected]);
+  return actions;
+}
+const objectMenu=$('object-menu');
+function openObjectMenu(event,id){
+  const axes=event.target.closest('[data-axes]');
+  if((!id&&!axes)||drag||dialog.open)return;
+  event.preventDefault();
+  const rect=event.currentTarget.getBoundingClientRect();
+  const x=event.clientX||rect.left,y=event.clientY||rect.top;
+  selected=id??null;setTool('Select');
+  const actions=id?objectActions(selectedObj()):[['Axes & scale',settings]];
+  objectMenu.replaceChildren(...actions.map(([name,act])=>{
+    const item=btn(name,()=>{objectMenu.hidePopover();act();});
+    item.setAttribute('role','menuitem');return item;
+  }));
+  objectMenu.showPopover();
+  objectMenu.style.left=G.clamp(x,6,innerWidth-objectMenu.offsetWidth-6)+'px';
+  objectMenu.style.top=G.clamp(y,6,innerHeight-objectMenu.offsetHeight-6)+'px';
+  objectMenu.firstElementChild.focus({preventScroll:true});
+}
+objectMenu.onkeydown=event=>{
+  const items=[...objectMenu.children],index=items.indexOf(document.activeElement);
+  const next={ArrowDown:(index+1)%items.length,ArrowUp:(index+items.length-1)%items.length,Home:0,End:items.length-1}[event.key];
+  if(next!==undefined){event.preventDefault();items[next].focus();}
+  event.stopPropagation();
+};
+function renderSelection(){
+  for(const row of $('objects').querySelectorAll('button'))row.classList.toggle('active',row.dataset.id===selected);
+  const o=selectedObj();
+  $('inspector').replaceChildren(...(o?objectActions(o).map(([name,act])=>btn(name,act)):[]));
+}
+function render(keepObjectRows=false){
+  if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();
   const g=graph();document.title=g.name+' · Kvasir Graph';$('title').textContent=g.name;
   $('graphs').replaceChildren(...state.graphs.map(item=>{
     const b=btn('',()=>{resetTools();state.active=item.id;cache=null;save();render();},'graph'+(item===g?' active':''));b.innerHTML=icon('Graph');b.append(item.name);return b;
   }));
-  $('objects').replaceChildren(...g.objects.map(o=>{
-    const b=btn('',()=>{selected=o.id;setTool('Select');},'object'+(o.id===selected?' active':''));
+  if(!keepObjectRows)$('objects').replaceChildren(...g.objects.map(o=>{
+    const b=btn('',()=>{selected=o.id;setTool('Select',true);},'object');
+    b.dataset.id=o.id;
+    b.oncontextmenu=e=>openObjectMenu(e,o.id);
+    b.ondblclick=()=>editObject(o);
     const sample=document.createElement('span'),name=document.createElement('span');
     sample.className='sample '+o.kind;sample.style.backgroundColor=color(o);
     renderLabel(name,o.name);b.append(sample,name);return b;
   }));
-  if(!g.objects.length)$('objects').append(Object.assign(document.createElement('span'),{className:'empty',textContent:'Objects appear as you draw.'}));
-  const o=selectedObj(),ins=$('inspector');ins.replaceChildren();
-  if(o){
-    ins.append(btn('Edit',()=>editObject(o)));
-    if(o.kind!=='label'&&(o.kind!=='guide'||o.showLabel))ins.append(btn('Move label',()=>setTool('Move label')));
-    if(['line','u','free','guide'].includes(o.kind))ins.append(btn('Copy & shift',()=>shiftDialog(o)));
-    if(o.kind==='region')ins.append(btn('Add area',()=>{setTool('Shade');shadeGroup=o.id;$('hint').textContent='Click another area to include in '+o.name+'.';}));
-    if(o.pts.some(p=>p.ref))ins.append(btn('Detach',()=>commit(()=>{o.pts=scene.resolved.get(o.id).pts.map(({x,y})=>({x,y}));})));
-    ins.append(btn('Delete',deleteSelected));
-  }
+  if(!keepObjectRows&&!g.objects.length)$('objects').append(Object.assign(document.createElement('span'),{className:'empty',textContent:'Objects appear as you draw.'}));
+  renderSelection();
   $('grid').checked=g.grid;$('snap').checked=g.snap;$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;
   $('toolbar').replaceChildren(...Object.keys(hints).map(n=>{const b=btn('',()=>setTool(n),n===tool?'active':'');b.innerHTML=icon(n);b.append(n);b.setAttribute('aria-pressed',tool===n);return b;}));
   const opts=$('options');opts.replaceChildren();
@@ -257,6 +295,13 @@ function hit(event,p){
   }
   return best||direct;
 }
+plot.oncontextmenu=event=>openObjectMenu(event,hit(event,position(event,true)));
+plot.ondblclick=event=>{
+  if(tool!=='Select'||event.button!==0)return;
+  const o=selectedObj();
+  if(o){event.preventDefault();editObject(o);}
+  else if(event.target.closest('[data-axes]')){event.preventDefault();settings();}
+};
 function addShape(o){
   // A new boundary may subdivide an existing fill. Keep all its child faces.
   const existing=graph().objects.filter(x=>x.kind==='region').map(r=>[r,r.pieces.map(p=>M.findFace(p,faces)).filter(Boolean)]);
@@ -318,7 +363,7 @@ plot.onpointerdown=event=>{
       drag={type,idx,labelOrigin,raw:type==='caption'?raw:position(event),snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
       plot.setPointerCapture(event.pointerId);
     }else selected=null;
-    render();return;
+    renderSelection();renderHandles();return;
   }
   const p=snap(raw,event);
   if(tool==='Shade'){
@@ -401,7 +446,7 @@ plot.onpointerup=event=>{
       const last=snap(position(event),event),pts=G.freehand(end.pts);pts[0]=end.pts[0];pts[pts.length-1]=last;
       addShape(M.shape('free',nextName('Curve'),pts,newColor()));
     }else render();
-  }else if(end.moved){remember(end.snapshot);cache=null;save();render();}else render();
+  }else if(end.moved){remember(end.snapshot);cache=null;save();render();}
 };
 plot.onpointercancel=()=>{if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}if(drag?.type==='guide')start=null;drag=null;hover=null;render();};
 plot.onpointerleave=()=>{if(!drag){hover=null;snapText='';renderPreview();}};
