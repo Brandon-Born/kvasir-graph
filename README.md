@@ -2,6 +2,8 @@
 
 Open **index.html** in Edge, Chrome, or Firefox. The editor runs locally with no installation, server, or internet connection.
 
+You may modify and share the editor. Selling it or including its code in a commercial software product or service requires separate written permission. You may use the graphs you create commercially. [Full license](LICENSE)
+
 ## Make a graph
 
 1. Choose **New graph → Start with → Supply and demand equations** to plot one or both linear equations. Enter quantity form (such as `Qd = 136 - 2P` and `Qs = 3P - 69`) or inverse form (such as `P = 23 + Q/3`). Check the axis preview, then choose **Create graph**. For manual drawing, choose **Blank graph** and set the axis limits yourself. **Axes & scale** changes either axis later.
