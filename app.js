@@ -9,7 +9,22 @@ const icons={
 function icon(name){return '<svg viewBox="0 0 20 20" aria-hidden="true" fill="'+(name==='Point'?'currentColor':'none')+'" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="'+icons[name]+'"/></svg>';}
 function btn(label,fn,cls=''){const b=document.createElement('button');b.type='button';b.textContent=label;b.className=cls;b.onclick=fn;return b;}
 function svg(tag,attrs,parent=plot){const e=document.createElementNS(plot.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);parent.append(e);return e;}
-function txt(parent,text,x,y,attrs={}){const el=svg('text',{x,y,fill:M.ink,'font-family':'Georgia,serif',...attrs},parent);el.textContent=text;return el;}
+// Keep labels as editable strings in workspace backups. Use native text runs
+// so arbitrary subscripts also survive standalone SVG, PNG and print export.
+function renderLabel(el,value){
+  el.replaceChildren();
+  let end=0;
+  for(const match of value.matchAll(/_\{([^{}]+)\}/g)){
+    el.append(value.slice(end,match.index));
+    const sub=el.namespaceURI===plot.namespaceURI
+      ? svg('tspan',{'baseline-shift':'sub','font-size':'70%'},el)
+      : el.appendChild(document.createElement('sub'));
+    sub.textContent=match[1];
+    end=match.index+match[0].length;
+  }
+  el.append(value.slice(end));
+}
+function txt(parent,text,x,y,attrs={}){const el=svg('text',{x,y,fill:M.ink,'font-family':'Georgia,serif',...attrs},parent);renderLabel(el,text);return el;}
 let state,storageIssue=false;
 try{const raw=localStorage.getItem(key);if(raw){state=JSON.parse(raw);if(!M.validWorkspace(state))throw Error();}}catch{state=null;storageIssue=true;}
 if(!state){const g=M.demo();state={version:1,graphs:[g],active:g.id};}
@@ -114,7 +129,10 @@ function render(){
     const b=btn('',()=>{resetTools();state.active=item.id;cache=null;save();render();},'graph'+(item===g?' active':''));b.innerHTML=icon('Graph');b.append(item.name);return b;
   }));
   $('objects').replaceChildren(...g.objects.map(o=>{
-    const b=btn('',()=>{selected=o.id;setTool('Select');},'object'+(o.id===selected?' active':'')),s=document.createElement('span');s.className='sample '+o.kind;s.style.backgroundColor=color(o);b.append(s,o.name);return b;
+    const b=btn('',()=>{selected=o.id;setTool('Select');},'object'+(o.id===selected?' active':''));
+    const sample=document.createElement('span'),name=document.createElement('span');
+    sample.className='sample '+o.kind;sample.style.backgroundColor=color(o);
+    renderLabel(name,o.name);b.append(sample,name);return b;
   }));
   if(!g.objects.length)$('objects').append(Object.assign(document.createElement('span'),{className:'empty',textContent:'Objects appear as you draw.'}));
   const o=selectedObj(),ins=$('inspector');ins.replaceChildren();
@@ -189,7 +207,7 @@ function snap(raw,event,exclude=null){
   return p;
 }
 function hit(event,p){
-  const direct=event.target.dataset.id;
+  const direct=event.target.closest('[data-id]')?.dataset.id;
   if(direct&&scene.resolved.get(direct)?.kind!=='region')return direct;
   let best=null,dist=tolerance();
   for(const o of scene.resolved.values()){
@@ -235,7 +253,7 @@ plot.onpointerdown=event=>{
     const active=scene.resolved.get(selected),idx=active?.kind==='free'?-1:active?.pts.findIndex(p=>distance(p,raw)<tolerance());
     if(idx>=0||id){
       selected=idx>=0?selected:id;const obj=scene.resolved.get(selected);
-      const label=idx>=0?false:event.target.dataset.label==='1'&&obj.kind!=='label';
+      const label=idx>=0?false:!!event.target.closest('[data-label]')&&obj.kind!=='label';
       drag={type:idx>=0?'handle':label?'caption':'move',idx,raw,snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
       plot.setPointerCapture(event.pointerId);
     }else selected=null;
@@ -323,13 +341,47 @@ function field(label,value,type='text',parent=fields){
   if(type==='number')input.step='any';if(type==='text')input.maxLength=120;
   el.append(input);parent.append(el);return input;
 }
+function labelField(label,value){
+  const input=field(label,value),row=document.createElement('div');
+  row.className='label-field';
+  const wrapper=input.parentElement;
+  wrapper.before(row);row.append(wrapper);
+  const preview=document.createElement('output');
+  preview.className='label-preview';
+  preview.setAttribute('aria-label','Label preview');preview.setAttribute('aria-live','polite');
+  function refresh(){
+    renderLabel(preview,input.value);
+    preview.hidden=!input.value.includes('_{');
+  }
+  function insertSubscript(){
+    let start=input.selectionStart,end=input.selectionEnd;
+    // The dialog initially selects the default label for quick replacement.
+    if(start===0 && end===input.value.length && input.value===value)start=end;
+    const selected=input.value.slice(start,end);
+    const suffix=selected||'1';
+    const enclosing=[...input.value.matchAll(/_\{([^{}]+)\}/g)].find(
+      m=>start>=m.index+2 && end<=m.index+m[0].length-1);
+    input.focus();
+    if(enclosing){
+      input.setSelectionRange(enclosing.index+2,enclosing.index+enclosing[0].length-1);
+      return;
+    }
+    input.setRangeText('_{'+suffix+'}',start,end,'end');
+    input.setSelectionRange(start+2,start+2+suffix.length);
+    refresh();
+  }
+  const button=btn('x₂ Subscript',insertSubscript,'subscript-button');
+  button.title='Format selected text, or insert a 1 you can type over';
+  row.append(button);row.after(preview);input.addEventListener('input',refresh);refresh();
+  return input;
+}
 function submit(label,fn){
   const b=btn(label,()=>{},'primary');b.type='submit';$('form-actions').append(b);
   form.onsubmit=e=>{e.preventDefault();if(form.reportValidity()&&fn()!==false)dialog.close();};
   const first=fields.querySelector('input');if(first){first.focus();if(first.type==='text')first.select();}
 }
 function objectForm(title,defaultName,defaultColor,fn){
-  modal(title);const n=field('Label',defaultName),c=field('Color',defaultColor,'color');
+  modal(title);const n=labelField('Label',defaultName),c=field('Color',defaultColor,'color');
   submit('Apply',()=>fn(n.value.trim()||defaultName,c.value));
 }
 function pointFields(label,p){
@@ -338,14 +390,14 @@ function pointFields(label,p){
   return ()=>({x:x.valueAsNumber,y:y.valueAsNumber});
 }
 function exactLine(){
-  modal('Draw a straight line');const name=field('Curve label',nextName('Line'));
+  modal('Draw a straight line');const name=labelField('Curve label',nextName('Line'));
   const a=pointFields('First point',{x:0,y:0}),b=pointFields('Second point',{x:graph().xmax,y:graph().ymax});
   const c=field('Color',newColor(),'color');
   submit('Add line',()=>{if(distance(a(),b())<.001){notice('Choose two different endpoints.');return false;}addShape(M.shape('line',name.value,[a(),b()],c.value));});
 }
 function editObject(o){
   modal('Edit '+(o.kind==='region'?'area':o.kind==='u'?'U-shaped curve':o.kind==='free'?'curve':o.kind));
-  const n=field('Name',o.name),label=o.caption!==undefined?field('Label on graph',o.caption):null,c=field('Color',color(o),'color');
+  const n=o.caption===undefined?labelField('Name',o.name):field('Name',o.name),label=o.caption!==undefined?labelField('Label on graph',o.caption):null,c=field('Color',color(o),'color');
   let show=null;if(o.kind==='guide'){show=field('Show label on graph','','checkbox');show.required=false;show.checked=!!o.showLabel;}
   const base=scene.resolved.get(o.id).pts,points=base.length<=3?base.map((p,i)=>pointFields(o.kind==='u'?['Left arm','Minimum','Right arm'][i]:base.length===1?'Position':'Endpoint '+(i+1),p)):[];
   submit('Apply',()=>{
@@ -357,7 +409,7 @@ function editObject(o){
   });
 }
 function shiftDialog(o){
-  modal('Copy and shift');const n=field('New curve label',o.name+'′'),dx=field('Quantity shift (ΔQ)',0,'number'),dy=field('Price shift (ΔP)',5,'number');
+  modal('Copy and shift');const n=labelField('New curve label',o.name+'′'),dx=field('Quantity shift (ΔQ)',0,'number'),dy=field('Price shift (ΔP)',5,'number');
   submit('Add shifted copy',()=>{
     const copy=clone(o);copy.id=M.id();copy.name=n.value;delete copy.caption;delete copy.labelAt;
     copy.pts=scene.resolved.get(o.id).pts.map(p=>({x:p.x+dx.valueAsNumber,y:p.y+dy.valueAsNumber}));copy.color=newColor();addShape(copy);
@@ -435,7 +487,7 @@ function newGraph(){
   });
 }
 function settings(){
-  const g=graph();modal('Axes and scale');const x=field('Horizontal axis label',g.xlabel),y=field('Vertical axis label',g.ylabel),xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
+  const g=graph();modal('Axes and scale');const x=labelField('Horizontal axis label',g.xlabel),y=labelField('Vertical axis label',g.ylabel),xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
   xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;}));
 }
 function graphMenu(){menu('Graph actions',[

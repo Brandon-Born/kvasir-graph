@@ -3,3 +3,6 @@
 @media(max-width:630px){header{padding:0 12px;gap:8px;height:56px}.brand{font-size:22px}.brand svg{width:24px}#saved{display:none}.layout{display:flex;flex-direction:column}main{order:-1}.heading{margin-bottom:12px}aside{border:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:15px}aside section+section{border:0;padding-top:0}#toolbar{padding:5px;gap:0}#toolbar button{flex:1;flex-direction:column;gap:3px;font-size:12px}#plot{min-height:0;max-height:none}.status{margin-top:6px}.head-actions{gap:3px}.head-actions .primary{padding-inline:9px}}
 @media print{@page{size:landscape;margin:1cm}header,aside,#toolbar,#options,.status,#graph-menu,dialog{display:none!important}.layout{display:block}main{padding:0}.sheet{border:0;box-shadow:none}body{background:#fff}#plot{max-height:77vh}.editor-only{display:none}h1{font-size:26px}}
 .pair[hidden]{display:none}.range-preview:not(:empty){display:block;padding:9px 12px;border-radius:6px;background:var(--soft);font-size:14px}
+.label-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
+.subscript-button{margin-bottom:10px;font-size:14px;color:var(--teal);white-space:nowrap}
+.label-preview:not([hidden]){display:block;color:var(--ink);background:#f2f7f7;padding:6px 10px;border-radius:5px;font:italic 19px var(--serif);overflow-wrap:anywhere}
