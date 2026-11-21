@@ -2,7 +2,9 @@
 
 Open **index.html** in Edge, Chrome, or Firefox. The editor runs locally with no installation, server, or internet connection.
 
-You may modify and share the editor. Selling it or including its code in a commercial software product or service requires separate written permission. You may use the graphs you create commercially. [Full license](LICENSE)
+Kvasir Graph uses the [PolyForm Noncommercial License 1.0.0](LICENSE). It permits using, modifying, and sharing the editor for noncommercial purposes.
+
+Required Notice: Copyright 2026 Brandon Born
 
 ## Make a graph
 
