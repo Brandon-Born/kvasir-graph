@@ -33,6 +33,9 @@ const undo=[],redo=[], graph=()=>state.graphs.find(g=>g.id===state.active);
 const selectedObj=()=>graph().objects.find(o=>o.id===selected);
 const num=v=>String(Number(v.toFixed(5))), color=o=>/^#[0-9a-f]{6}$/i.test(o.color)?o.color:M.ink;
 const box={x:76,y:46,w:755,h:409};
+const minFontSize=8,maxFontSize=48;
+const fontSize=(value,fallback)=>Number.isFinite(value)?G.clamp(value,minFontSize,maxFontSize):fallback;
+const objectFontSize=o=>fontSize(o.fontSize,o.kind==='region'?18:20);
 const X=x=>box.x+x*box.w/graph().xmax,Y=y=>box.y+box.h-y*box.h/graph().ymax;
 const scaled=p=>({x:X(p.x),y:Y(p.y)});
 const pathData=pts=>pts.map((p,i)=>(i?'L':'M')+X(p.x).toFixed(3)+' '+Y(p.y).toFixed(3)).join(' ');
@@ -88,18 +91,25 @@ function renderPlot(){
   const axis=svg('g',{},labels);
   svg('path',{d:'M76 35V455H846',fill:'none',stroke:M.ink,'stroke-width':1.8},axis);
   svg('path',{d:'m76 32-4 9h8z M848 455l-9-4v8z',fill:M.ink},axis);
-  txt(labels,g.ylabel,box.x-4,24,{'font-style':'italic','font-size':19});
-  txt(labels,g.xlabel,850,509,{'text-anchor':'end','font-style':'italic','font-size':19});
+  const ySize=fontSize(g.yFontSize,19);
+  txt(labels,g.ylabel,box.x-4,Math.max(24,ySize),{'font-style':'italic','font-size':ySize});
+  txt(labels,g.xlabel,850,509,{'text-anchor':'end','font-style':'italic','font-size':fontSize(g.xFontSize,19)});
   for(const o of scene.resolved.values()){
     if(o.kind==='point'){const p=scaled(o.pts[0]);svg('circle',{cx:p.x,cy:p.y,r:5.6,fill:color(o),stroke:'white','stroke-width':2,'data-id':o.id},labels);}
     if(o.kind==='guide'&&!o.showLabel)continue;
     const p=labelPosition(o);if(!p)continue;
     const isCurve=['line','u','free','guide'].includes(o.kind);
     const offset=o.labelAt||o.kind==='label'||o.kind==='region'?{x:0,y:0}:isCurve?{x:8,y:p.y<g.ymax*.03?-9:4}:{x:10,y:-10};
-    const x=G.clamp(X(p.x)+offset.x,10,887),y=G.clamp(Y(p.y)+offset.y,18,498);
-    txt(labels,o.caption??o.name,x,y,{'font-size':o.kind==='region'?18:20,'font-style':'italic','font-weight':isCurve?600:400,
+    const size=objectFontSize(o);
+    const x=G.clamp(X(p.x)+offset.x,10,887),y=G.clamp(Y(p.y)+offset.y,Math.max(18,size*.9),498);
+    const caption=txt(labels,o.caption??o.name,x,y,{'font-size':size,'font-style':'italic','font-weight':isCurve?600:400,
       'text-anchor':o.kind==='region'?'middle':x>795&&(o.caption??o.name).length>4?'end':'start',
       fill:o.kind==='region'?M.ink:color(o),'data-id':o.id,'data-label':'1','pointer-events':'bounding-box','paint-order':'stroke',stroke:'white','stroke-width':o.kind==='region'?0:3});
+    if(o.fontSize){
+      const bounds=caption.getBBox();
+      if(bounds.x<4)caption.setAttribute('x',x+4-bounds.x);
+      else if(bounds.x+bounds.width>896)caption.setAttribute('x',x-Math.min(bounds.x-4,bounds.x+bounds.width-896));
+    }
   }
   const overlay=svg('g',{class:'editor-only','pointer-events':'none',id:'overlay'});
   const obj=scene.resolved.get(selected);
@@ -319,10 +329,10 @@ plot.onpointerdown=event=>{
   }
   if(tool==='Label'){
     if(id&&labelMode==='object'){editObject(g.objects.find(o=>o.id===id));return;}
-    objectForm('Place label','Label',M.ink,(name,color)=>addShape(M.shape('label',name,[p],color)));return;
+    objectForm('Place label','Label',M.ink,(name,color,fontSize)=>addShape({...M.shape('label',name,[p],color),fontSize}));return;
   }
   if(tool==='Point'){
-    objectForm('Mark point','E',M.ink,(name,color)=>addShape(M.shape('point',name,[p],color)));
+    objectForm('Mark point','E',M.ink,(name,color,fontSize)=>addShape({...M.shape('point',name,[p],color),fontSize}));
     notice('Q = '+num(p.x)+'     P = '+num(p.y)+(snapText?'   ·   '+snapText:''));return;
   }
   if(tool==='Draw'&&drawMode==='free'){
@@ -407,17 +417,21 @@ function field(label,value,type='text',parent=fields){
   if(type==='number')input.step='any';if(type==='text')input.maxLength=120;
   el.append(input);parent.append(el);return input;
 }
-function labelField(label,value){
+function labelField(label,value,initialSize=20){
   const input=field(label,value),row=document.createElement('div');
   row.className='label-field';
   const wrapper=input.parentElement;
   wrapper.before(row);row.append(wrapper);
+  const size=field('Size (px)',initialSize,'number',row);
+  size.min=minFontSize;size.max=maxFontSize;size.step='1';
+  size.setAttribute('aria-label',label+' font size (px)');
   const preview=document.createElement('output');
   preview.className='label-preview';
   preview.setAttribute('aria-label','Label preview');preview.setAttribute('aria-live','polite');
   function refresh(){
     renderLabel(preview,input.value);
-    preview.hidden=!input.value.includes('_{');
+    preview.hidden=!input.value;
+    preview.style.fontSize=fontSize(size.valueAsNumber,initialSize)+'px';
   }
   function insertSubscript(){
     let start=input.selectionStart,end=input.selectionEnd;
@@ -438,17 +452,17 @@ function labelField(label,value){
   }
   const button=btn('x₂ Subscript',insertSubscript,'subscript-button');
   button.title='Format selected text, or insert a 1 you can type over';
-  row.append(button);row.after(preview);input.addEventListener('input',refresh);refresh();
-  return input;
+  row.append(button);row.after(preview);row.addEventListener('input',refresh);refresh();
+  return {get value(){return input.value;},get fontSize(){return size.valueAsNumber;}};
 }
 function submit(label,fn){
   const b=btn(label,()=>{},'primary');b.type='submit';$('form-actions').append(b);
   form.onsubmit=e=>{e.preventDefault();if(form.reportValidity()&&fn()!==false)dialog.close();};
   const first=fields.querySelector('input');if(first){first.focus();if(first.type==='text')first.select();}
 }
-function objectForm(title,defaultName,defaultColor,fn){
-  modal(title);const n=labelField('Label',defaultName),c=field('Color',defaultColor,'color');
-  submit('Apply',()=>fn(n.value.trim()||defaultName,c.value));
+function objectForm(title,defaultName,defaultColor,fn,initialSize=20){
+  modal(title);const n=labelField('Label',defaultName,initialSize),c=field('Color',defaultColor,'color');
+  submit('Apply',()=>fn(n.value.trim()||defaultName,c.value,n.fontSize));
 }
 function pointFields(label,p){
   const pair=document.createElement('div');pair.className='pair';fields.append(pair);
@@ -459,30 +473,32 @@ function exactLine(){
   modal('Draw a straight line');const name=labelField('Curve label',nextName('Line'));
   const a=pointFields('First point',{x:0,y:0}),b=pointFields('Second point',{x:graph().xmax,y:graph().ymax});
   const c=field('Color',newColor(),'color');
-  submit('Add line',()=>{if(distance(a(),b())<.001){notice('Choose two different endpoints.');return false;}addShape(M.shape('line',name.value,[a(),b()],c.value));});
+  submit('Add line',()=>{if(distance(a(),b())<.001){notice('Choose two different endpoints.');return false;}addShape({...M.shape('line',name.value,[a(),b()],c.value),fontSize:name.fontSize});});
 }
 function editObject(o){
   modal('Edit '+(o.kind==='region'?'area':o.kind==='u'?'U-shaped curve':o.kind==='free'?'curve':o.kind));
-  const n=o.caption===undefined?labelField('Name',o.name):field('Name',o.name),label=o.caption!==undefined?labelField('Label on graph',o.caption):null,c=field('Color',color(o),'color');
+  const size=objectFontSize(o);
+  const n=o.caption===undefined?labelField('Name',o.name,size):field('Name',o.name);
+  const label=o.caption!==undefined?labelField('Label on graph',o.caption,size):null,c=field('Color',color(o),'color');
   let show=null;if(o.kind==='guide'){show=field('Show label on graph','','checkbox');show.required=false;show.checked=!!o.showLabel;}
   const base=scene.resolved.get(o.id).pts,points=base.length<=3?base.map((p,i)=>pointFields(o.kind==='u'?['Left arm','Minimum','Right arm'][i]:base.length===1?'Position':'Endpoint '+(i+1),p)):[];
   submit('Apply',()=>{
     const updated=points.map(fn=>fn());
     if(o.kind==='u'&&!(updated[0].x<updated[1].x&&updated[1].x<updated[2].x&&updated[1].y<=Math.min(updated[0].y,updated[2].y))){notice('Keep the minimum between and below both arms.');return false;}
     if(['line','guide'].includes(o.kind)&&distance(updated[0],updated[1])<.001){notice('Choose two different endpoints.');return false;}
-    commit(()=>{o.name=n.value;o.color=c.value;if(label)o.caption=label.value;if(show)o.showLabel=show.checked;
+    commit(()=>{o.name=n.value;o.color=c.value;o.fontSize=(label??n).fontSize;if(label)o.caption=label.value;if(show)o.showLabel=show.checked;
       updated.forEach((p,i)=>{if(num(base[i].x)!==num(p.x)||num(base[i].y)!==num(p.y))o.pts[i]=p;});});
   });
 }
 function shiftDialog(o){
-  modal('Copy and shift');const n=labelField('New curve label',o.name+'′'),dx=field('Quantity shift (ΔQ)',0,'number'),dy=field('Price shift (ΔP)',5,'number');
+  modal('Copy and shift');const n=labelField('New curve label',o.name+'′',objectFontSize(o)),dx=field('Quantity shift (ΔQ)',0,'number'),dy=field('Price shift (ΔP)',5,'number');
   submit('Add shifted copy',()=>{
-    const copy=clone(o);copy.id=M.id();copy.name=n.value;delete copy.caption;delete copy.labelAt;
+    const copy=clone(o);copy.id=M.id();copy.name=n.value;copy.fontSize=n.fontSize;delete copy.caption;delete copy.labelAt;
     copy.pts=scene.resolved.get(o.id).pts.map(p=>({x:p.x+dx.valueAsNumber,y:p.y+dy.valueAsNumber}));copy.color=newColor();addShape(copy);
   });
 }
 function areaDialog(piece){
-  objectForm('Shade area','CS',M.teal,(name,c)=>addShape({...M.shape('region',name,[],c),pieces:[piece]}));
+  objectForm('Shade area','CS',M.teal,(name,c,fontSize)=>addShape({...M.shape('region',name,[],c),fontSize,pieces:[piece]}),18);
 }
 function notice(msg){let e=$('notice');if(!e){e=document.createElement('p');e.id='notice';fields.append(e);}e.textContent=msg;}
 function deleteSelected(){
@@ -553,8 +569,10 @@ function newGraph(){
   });
 }
 function settings(){
-  const g=graph();modal('Axes and scale');const x=labelField('Horizontal axis label',g.xlabel),y=labelField('Vertical axis label',g.ylabel),xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
-  xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;}));
+  const g=graph();modal('Axes and scale');
+  const x=labelField('Horizontal axis label',g.xlabel,fontSize(g.xFontSize,19)),y=labelField('Vertical axis label',g.ylabel,fontSize(g.yFontSize,19));
+  const xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
+  xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xFontSize=x.fontSize;g.yFontSize=y.fontSize;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;}));
 }
 function graphMenu(){menu('Graph actions',[
   ['Rename graph',()=>{modal('Rename graph');const n=field('Graph title',graph().name);submit('Rename',()=>commit(()=>graph().name=n.value));}],

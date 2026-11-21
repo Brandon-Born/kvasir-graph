@@ -11,7 +11,7 @@ Open **index.html** in Edge, Chrome, or Firefox. The editor runs locally with no
 5. With **Select**, drag a curve, its handles, or its label. The object list gives access to **Edit**, **Copy & shift**, and **Delete**. A U-shaped curve's minimum stays attached when snapped to MC. **Detach** releases its anchors.
 6. The **•••** menu beside the title duplicates or renames a graph. To compare supply curves, duplicate the graph, select supply, and use **Copy & shift** with a quantity shift of 0 and the desired price shift.
 
-When naming a point, curve, axis, area, or free-text label, click **x₂ Subscript** after the base text. Type over the selected **1** for a different suffix, or highlight existing letters and click the button to lower them. The preview shows the formatted label.
+When naming a point, curve, axis, area, or free-text label, use **Size (px)** to adjust its font size. Click **x₂ Subscript** after the base text to insert a subscript. Type over the selected **1** for a different suffix, or highlight existing letters and click the button to lower them. The preview shows the formatted label.
 
 ## Save and export
 
