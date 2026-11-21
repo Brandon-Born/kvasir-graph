@@ -151,10 +151,11 @@ function render(){
     for(const [k,v] of [['line','Straight line'],['u','U-shaped'],['free','Freehand']])opts.append(btn(v,()=>{drawMode=k;setTool('Draw');},k===drawMode?'active':''));
     if(drawMode==='line')opts.append(btn('Enter coordinates',()=>exactLine()));
   }
-  if(tool==='Guide')for(const [k,v] of [['auto','Any angle'],['h','Horizontal'],['v','Vertical']])opts.append(btn(v,()=>{guideMode=k;setTool('Guide');},guideMode===k?'active':''));
+  if(tool==='Guide')for(const [k,v] of [['auto','Auto'],['h','Horizontal'],['v','Vertical'],['free','Any angle']])opts.append(btn(v,()=>{guideMode=k;setTool('Guide');},guideMode===k?'active':''));
   if(tool==='Label')for(const [k,v] of [['object','Object label'],['text','Free text']])opts.append(btn(v,()=>{labelMode=k;setTool('Label');},labelMode===k?'active':''));
   $('hint').textContent=start?'Click the second endpoint. Esc cancels.':tool==='Draw'&&drawMode==='u'?'Click to place the minimum. Drag either arm to reshape.':tool==='Draw'&&drawMode==='free'?'Drag to sketch a smooth curve.':hints[tool];
   if(tool==='Move label')$('hint').textContent='Click where the label should appear. Esc cancels.';
+  if(tool==='Guide'&&guideMode==='auto')$('hint').textContent=start?'Move near the P or Q axis, then click or release to place the guide.':'Click or drag from an intersection toward the P or Q axis.';
   plot.style.cursor=tool==='Move label'?'crosshair':'';
   renderPlot();
 }
@@ -177,11 +178,34 @@ function depends(id,target,visited=new Set()){
   if(id===target)return true;if(visited.has(id))return false;visited.add(id);
   return graph().objects.find(o=>o.id===id)?.pts.some(p=>p.ref&&[p.ref.a,p.ref.b].filter(Boolean).some(k=>depends(k,target,visited)))||false;
 }
+function axisProjection(from,pointer){
+  if(distance(from,pointer)<3)return null;
+  const priceGap=Math.abs(X(pointer.x)-X(0)),quantityGap=Math.abs(Y(pointer.y)-Y(0));
+  const reach=1.6*tolerance();
+  const nearPrice=from.x>0&&priceGap<=reach,nearQuantity=from.y>0&&quantityGap<=reach;
+  if(!nearPrice&&!nearQuantity)return null;
+  // At the origin both axes can be within reach. Use the projection whose
+  // endpoint is closest to the pointer, measured on screen.
+  const left={x:0,y:from.y},bottom={x:from.x,y:0};
+  const horizontal=nearPrice&&(!nearQuantity||distance(left,pointer)<=distance(bottom,pointer));
+  const point=horizontal?left:bottom,axis=horizontal?'@price':'@quantity';
+  snapText=horizontal?'Horizontal to P axis':'Vertical to Q axis';
+  return {...point,ref:{a:axis,t:pathParameter(scene.paths.get(axis),point)}};
+}
+function projectedOrientation(from,p){
+  if(p.ref?.a==='@price'&&p.y===from.y)return 'h';
+  if(p.ref?.a==='@quantity'&&p.x===from.x)return 'v';
+  return 'auto';
+}
 function snap(raw,event,exclude=null){
   getScene();snapText='';const g=graph(),p={...raw};
-  const constrained=start&&tool==='Guide'&&guideMode!=='auto';
+  const constrained=start&&tool==='Guide'&&(guideMode==='h'||guideMode==='v');
   if(constrained){if(guideMode==='h')p.y=start.y;else p.x=start.x;}
   if(!g.snap||event.altKey)return p;
+  if(start&&tool==='Guide'&&guideMode==='auto'){
+    const projection=axisProjection(start,p);
+    if(projection)return projection;
+  }
   const paths=[...scene.paths].filter(([id])=>!exclude||!depends(id,exclude));
   let candidates=[];const threshold=tolerance();
   function add(pt,label,rank,ref){
@@ -253,6 +277,16 @@ function interior(f){
 }
 function nextName(base){let i=1;const names=new Set(graph().objects.map(o=>o.name));while(names.has(base+' '+i))i++;return base+' '+i;}
 function newColor(){const colors=[M.teal,M.orange,'#556bb1','#9660a7'];return colors[graph().objects.filter(o=>['line','free','u'].includes(o.kind)).length%colors.length];}
+function finishSegment(p){
+  if(distance(start,p)<3)return;
+  const guide=tool==='Guide';
+  const o=M.shape(guide?'guide':'line',nextName(guide?'Guide':'Line'),[start,p],guide?M.ink:newColor());
+  if(guide){
+    o.orientation=guideMode==='auto'?projectedOrientation(start,p):guideMode;
+    o.sourceEnd=!start.ref?.b&&p.ref?.b?1:0;
+  }
+  addShape(o);
+}
 plot.onpointerdown=event=>{
   if(event.button!==0||drag)return;
   getScene();
@@ -298,12 +332,15 @@ plot.onpointerdown=event=>{
     const w=g.xmax*.16,h=g.ymax*.31;
     addShape(M.shape('u',nextName('Cost curve'),[{x:p.x-w,y:p.y+h},p,{x:p.x+w,y:p.y+h}],newColor()));return;
   }
-  if(!start){start=p;hover=p;render();return;}
-  if(distance(start,p)<3)return;
-  const guide=tool==='Guide';
-  const o=M.shape(guide?'guide':'line',nextName(guide?'Guide':'Line'),[start,p],guide?M.ink:newColor());
-  if(guide){o.orientation=guideMode;o.sourceEnd=!start.ref?.b&&p.ref?.b?1:0;}
-  addShape(o);
+  if(!start){
+    start=p;hover=p;
+    if(tool==='Guide'){
+      drag={type:'guide',clientX:event.clientX,clientY:event.clientY};
+      plot.setPointerCapture(event.pointerId);
+    }
+    render();return;
+  }
+  finishSegment(p);
 };
 plot.onpointermove=event=>{
   const raw=position(event,drag?.type==='caption');$('coords').textContent='Q '+num(raw.x)+'   ·   P '+num(raw.y);
@@ -311,14 +348,22 @@ plot.onpointermove=event=>{
     if(distance(raw,drag.pts.at(-1))>5&&drag.pts.length<320)drag.pts.push(raw);
     renderPreview();return;
   }
-  if(drag){
+  if(drag&&drag.type!=='guide'){
     if(!drag.moved&&distance(raw,drag.raw)<2)return;drag.moved=true;
     const o=selectedObj(),dx=raw.x-drag.raw.x,dy=raw.y-drag.raw.y,base=drag.base;
     if(drag.type==='caption'||o.kind==='region'){
       const initial=drag.labelOrigin||base.labelAt||labelPosition(base)||drag.raw;
       o.labelAt={x:initial.x+dx,y:initial.y+dy};
     }else if(drag.type==='handle'||['point','label'].includes(o.kind)){
-      const i=drag.idx>=0?drag.idx:0,p=snap(raw,event,o.id);hover=p;
+      const i=drag.idx>=0?drag.idx:0;
+      const autoGuide=o.kind==='guide'&&(drag.original.orientation??'auto')==='auto';
+      const from=autoGuide?base.pts[1-i]:null;
+      const projection=autoGuide&&graph().snap&&!event.altKey?axisProjection(from,raw):null;
+      const p=projection||snap(raw,event,o.id);hover=p;
+      if(autoGuide){
+        o.orientation=projectedOrientation(from,p);
+        o.sourceEnd=projection?1-i:drag.original.sourceEnd;
+      }
       if(o.kind==='u'){
         if(i===1)o.pts=base.pts.map((q,j)=>j===1?p:{x:q.x+p.x-base.pts[1].x,y:q.y+p.y-base.pts[1].y});
         else {o.pts=base.pts.map(({x,y})=>({x,y}));o.pts[1].ref=drag.original.pts[1].ref;
@@ -338,14 +383,17 @@ plot.onpointermove=event=>{
 };
 plot.onpointerup=event=>{
   if(!drag)return;const end=drag;drag=null;hover=null;snapText='';
-  if(end.type==='free'){
+  if(end.type==='guide'){
+    if(Math.hypot(event.clientX-end.clientX,event.clientY-end.clientY)>5)finishSegment(snap(position(event),event));
+    renderPreview();
+  }else if(end.type==='free'){
     if(end.pts.length>=2){
       const last=snap(position(event),event),pts=G.freehand(end.pts);pts[0]=end.pts[0];pts[pts.length-1]=last;
       addShape(M.shape('free',nextName('Curve'),pts,newColor()));
     }else render();
   }else if(end.moved){remember(end.snapshot);cache=null;save();render();}else render();
 };
-plot.onpointercancel=()=>{if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}drag=null;hover=null;render();};
+plot.onpointercancel=()=>{if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}if(drag?.type==='guide')start=null;drag=null;hover=null;render();};
 plot.onpointerleave=()=>{if(!drag){hover=null;snapText='';renderPreview();}};
 
 const dialog=$('dialog'),form=$('form'),fields=$('fields');
