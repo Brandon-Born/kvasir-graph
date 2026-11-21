@@ -383,9 +383,56 @@ function menu(title,items){
   modal(title);for(const [name,fn] of items)fields.append(btn(name,()=>{dialog.close();fn();},'menuitem'));
 }
 function newGraph(){
-  modal('New graph');const n=field('Graph title','Untitled graph'),x=field('Maximum quantity',150,'number'),y=field('Maximum price',80,'number');
-  x.min=y.min='.00001';
-  submit('Create graph',()=>commit(()=>{const g=M.blank(n.value,x.valueAsNumber,y.valueAsNumber);state.graphs.push(g);state.active=g.id;resetTools();}));
+  modal('New graph');
+  const title=field('Graph title','Untitled graph');
+  const modeLabel=document.createElement('label'),mode=document.createElement('select');
+  modeLabel.textContent='Start with';
+  mode.setAttribute('aria-label','Start with');
+  mode.add(new Option('Blank graph','blank'));
+  mode.add(new Option('Supply and demand equations','equations'));
+  modeLabel.append(mode);fields.append(modeLabel);
+
+  const manual=document.createElement('div'),equations=document.createElement('div');
+  fields.append(manual,equations);
+  const x=field('Maximum quantity',150,'number',manual),y=field('Maximum price',80,'number',manual);
+  x.min=y.min='.00001';manual.className='pair';
+  const demand=field('Demand equation','','text',equations),supply=field('Supply equation','','text',equations);
+  demand.placeholder='Qd = 136 − 2P';supply.placeholder='Qs = 3P − 69';
+  supply.required=demand.required=false;
+  const help=document.createElement('p'),preview=document.createElement('output');
+  help.textContent='Enter one or both linear equations in Q or P. The axes scale automatically.';
+  equations.prepend(help);equations.append(preview);preview.className='range-preview';
+  preview.setAttribute('aria-live','polite');
+  const fit=()=>MarketEquations.fit([{name:'Demand',text:demand.value},{name:'Supply',text:supply.value}]);
+  function updatePreview(showErrors){
+    preview.textContent='';
+    if(!supply.value.trim()&&!demand.value.trim()&&!showErrors)return;
+    try{
+      const result=fit();
+      preview.textContent='Quantity 0–'+result.xmax+'   ·   Price 0–'+result.ymax;
+      return result;
+    }catch(error){if(showErrors)preview.textContent=error.message;}
+  }
+  function switchMode(){
+    const automatic=mode.value==='equations';
+    manual.hidden=automatic;equations.hidden=!automatic;
+    x.disabled=y.disabled=automatic;demand.disabled=supply.disabled=!automatic;
+    if(automatic)updatePreview(false);
+  }
+  mode.onchange=switchMode;
+  equations.oninput=()=>updatePreview(false);
+  equations.onfocusout=()=>updatePreview(true);
+  switchMode();
+  submit('Create graph',()=>{
+    const automatic=mode.value==='equations',result=automatic?updatePreview(true):null;
+    if(automatic&&!result)return false;
+    const g=M.blank(title.value,result?.xmax??x.valueAsNumber,result?.ymax??y.valueAsNumber);
+    for(const curve of result?.curves??[]){
+      const o=M.shape('line',curve.name,curve.pts,curve.name==='Demand'?M.teal:M.orange);
+      o.caption=curve.name[0];g.objects.push(o);
+    }
+    commit(()=>{state.graphs.push(g);state.active=g.id;resetTools();});
+  });
 }
 function settings(){
   const g=graph();modal('Axes and scale');const x=field('Horizontal axis label',g.xlabel),y=field('Vertical axis label',g.ylabel),xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');

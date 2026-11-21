@@ -4,7 +4,7 @@ Open **index.html** in Edge, Chrome, or Firefox. The editor runs locally with no
 
 ## Make a graph
 
-1. Choose **New graph** and set the largest quantity and price. The opening market diagram is an editable example. **Axes & scale** changes either axis later.
+1. Choose **New graph → Start with → Supply and demand equations** to plot one or both linear equations. Enter quantity form (such as `Qd = 136 - 2P` and `Qs = 3P - 69`) or inverse form (such as `P = 23 + Q/3`). Check the axis preview, then choose **Create graph**. For manual drawing, choose **Blank graph** and set the axis limits yourself. **Axes & scale** changes either axis later.
 2. Choose **Draw → Straight line** and click two points. For exact intercepts, use **Enter coordinates**. Use **Draw → U-shaped** to place a minimum, then drag either arm. **Freehand** smooths a mouse or pen stroke.
 3. Use **Point** to mark a crossing. **Guide** draws between two clicks and can constrain the segment horizontally or vertically. Hover previews the snap and its coordinates. Hold **Alt** to place freely.
 4. Click **Shade**, click a bounded area, and enter its label and color. To combine several pieces under one label, select the area in **Graph objects**, choose **Add area**, and click the adjoining pieces.
