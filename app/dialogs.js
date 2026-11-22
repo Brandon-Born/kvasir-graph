@@ -55,8 +55,13 @@ function submit(label,fn){
   const first=fields.querySelector('input');if(first){first.focus();if(first.type==='text')first.select();}
 }
 function objectForm(title,defaultName,defaultColor,fn,initialSize=20){
-  modal(title);const n=labelField('Label',defaultName,initialSize),c=field('Color',defaultColor,'color');
+  modal(title);const n=labelField('Label',defaultName,initialSize),c=colorField(defaultColor);
   submit('Apply',()=>fn(n.value.trim()||defaultName,c.value,n.fontSize));
+}
+function colorField(value,parent=fields){
+  const group=document.createElement('fieldset'),legend=document.createElement('legend'),picker=swatches(value);
+  group.className='color-field';legend.textContent='Color';group.append(legend,picker.row);parent.append(group);
+  return picker;
 }
 function pointFields(label,p){
   const pair=document.createElement('div');pair.className='pair';fields.append(pair);
@@ -66,17 +71,17 @@ function pointFields(label,p){
 function exactLine(){
   modal('Draw a straight line');const name=labelField('Curve label',nextName('Line'));
   const a=pointFields('First point',{x:0,y:0}),b=pointFields('Second point',{x:graph().xmax,y:graph().ymax});
-  const c=field('Color',newColor(),'color');
+  const c=colorField(newColor());
   submit('Add line',()=>{if(distance(a(),b())<.001){notice('Choose two different endpoints.');return false;}addShape({...M.shape('line',name.value,[a(),b()],c.value),fontSize:name.fontSize});});
 }
 function exactPoint(){
   modal('Mark a point');const name=labelField('Label','E');
-  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=field('Color',M.ink,'color');
+  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=colorField(M.ink);
   submit('Add point',()=>{addShape({...M.shape('point',name.value.trim()||'E',[at()],c.value),fontSize:name.fontSize});});
 }
 function exactLabel(){
   modal('Place text');const name=labelField('Text','Label');
-  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=field('Color',M.ink,'color');
+  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=colorField(M.ink);
   submit('Add text',()=>{addShape({...M.shape('label',name.value.trim()||'Label',[at()],c.value),fontSize:name.fontSize});});
 }
 function exactGuides(){
@@ -109,7 +114,7 @@ function editObject(o){
   modal('Edit '+(o.kind==='region'?'area':o.kind==='u'?'U-shaped curve':o.kind==='free'?'curve':o.kind));
   const size=objectFontSize(o);
   const n=o.caption===undefined?labelField('Name',o.name,size):field('Name',o.name);
-  const label=o.caption!==undefined?labelField('Label on graph',o.caption,size):null,c=field('Color',color(o),'color');
+  const label=o.caption!==undefined?labelField('Label on graph',o.caption,size):null,c=colorField(color(o));
   let equation=null,expand=null;
   if(o.kind==='line'){
     equation=field('Equation (optional)',o.equation??'');equation.required=false;equation.placeholder='P = 68 − Q/2';

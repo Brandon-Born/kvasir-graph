@@ -72,6 +72,23 @@ test('selecting an object shows its actions in the sidebar', async () => {
   await page.keyboard.press('Escape');
 });
 
+test('colour swatches recolour the selection in one click and undo', async () => {
+  await page.locator('#objects button', {hasText: 'Supply'}).click();
+  await page.click('#inspector [aria-label=Blue]');
+  const supply = () => page.evaluate(() => graph().objects.find(o => o.name === 'Supply').color);
+  assert.equal(await supply(), '#556bb1');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Blue');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await supply(), '#9660a7');
+  await page.click('#inspector button.action >> text=Edit');
+  assert.ok(await page.isChecked('dialog [aria-label=Purple]'));
+  await page.click('dialog [aria-label=Red]');
+  await page.click('dialog button[type=submit]');
+  assert.equal(await supply(), '#b8323a');
+  for (let i = 0; i < 3; i++) await page.click('#undo');
+  assert.equal(await supply(), '#c35b21');
+});
+
 test('export opens a menu and edits survive a reload', async () => {
   await page.click('#export');
   assert.equal(await page.$$eval('#object-menu [role=menuitem]', items => items.length), 5);

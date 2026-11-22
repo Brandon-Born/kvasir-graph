@@ -139,7 +139,7 @@ function interior(f){
   return f.center;
 }
 function nextName(base){let i=1;const names=new Set(graph().objects.map(o=>o.name));while(names.has(base+' '+i))i++;return base+' '+i;}
-function newColor(){const colors=[M.teal,M.orange,'#556bb1','#9660a7'];return colors[graph().objects.filter(o=>['line','free','u'].includes(o.kind)).length%colors.length];}
+function newColor(){const colors=palette.slice(0,4).map(([,hex])=>hex);return colors[graph().objects.filter(o=>['line','free','u'].includes(o.kind)).length%colors.length];}
 function finishSegment(p){
   if(distance(start,p)<3)return;
   const guide=tool==='Guide';

@@ -14,6 +14,30 @@ const icons={
   Delete:'M3 5h14M8 5V3h4v2M5 5l1 12h8l1-12'
 };
 function icon(name){return '<svg viewBox="0 0 20 20" aria-hidden="true" fill="'+(name==='Point'?'currentColor':'none')+'" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="'+icons[name]+'"/></svg>';}
+// Colours offered as one-click swatches; any other colour goes through "Custom".
+const palette=[['Teal',M.teal],['Orange',M.orange],['Blue','#556bb1'],['Purple','#9660a7'],['Red','#b8323a'],['Gold','#a87b0c'],['Green','#4b8a2f'],['Slate',M.ink]];
+let swatchCount=0;
+// A row of colour radios plus a custom colour input. onPick runs on every change.
+function swatches(value,onPick=()=>{}){
+  const row=document.createElement('div'),name='swatch-'+(++swatchCount);
+  row.className='swatches';row.setAttribute('role','radiogroup');
+  let current=value.toLowerCase();
+  const radios=palette.map(([label,hex])=>{
+    const wrap=document.createElement('label'),r=document.createElement('input');
+    r.type='radio';r.name=name;r.value=hex;r.checked=hex.toLowerCase()===current;r.setAttribute('aria-label',label);
+    wrap.className='swatch';wrap.title=label;wrap.style.setProperty('--c',hex);
+    r.onchange=()=>{current=hex;custom.classList.remove('checked');onPick(hex);};
+    wrap.append(r);row.append(wrap);return r;
+  });
+  const custom=document.createElement('label'),input=document.createElement('input');
+  custom.className='swatch custom';custom.title='Custom colour';
+  input.type='color';input.value=value;input.setAttribute('aria-label','Custom colour');
+  custom.classList.toggle('checked',!radios.some(r=>r.checked));custom.style.setProperty('--c',value);
+  input.oninput=()=>{current=input.value;custom.style.setProperty('--c',current);radios.forEach(r=>r.checked=false);custom.classList.add('checked');};
+  input.onchange=()=>onPick(input.value);
+  custom.append(input);row.append(custom);
+  return {row,get value(){return current;}};
+}
 function btn(label,fn,cls=''){const b=document.createElement('button');b.type='button';b.textContent=label;b.className=cls;b.onclick=fn;return b;}
 function svg(tag,attrs,parent=plot){const e=document.createElementNS(plot.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);parent.append(e);return e;}
 // Keep labels as editable strings in workspace backups. Use native text runs

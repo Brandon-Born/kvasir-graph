@@ -96,7 +96,10 @@ function renderSelection(){
   const head=document.createElement('div'),sample=document.createElement('span'),name=document.createElement('span');
   head.className='inspector-head';sample.className='sample '+o.kind;sample.style.backgroundColor=color(o);renderLabel(name,o.name);head.append(sample,name);
   const keys={Edit:'Enter',Delete:'Del'};
-  $('inspector').replaceChildren(head,...objectActions(o).map(([label,act])=>{
+  // One click recolours the selection; keep focus on the chosen swatch after the re-render.
+  const picker=swatches(color(o),hex=>{commit(()=>{o.color=hex;});$('inspector').querySelector('input[value="'+hex+'"]')?.focus();});
+  picker.row.classList.add('inspector-colors');picker.row.setAttribute('aria-label','Color of '+o.name);
+  $('inspector').replaceChildren(head,picker.row,...objectActions(o).map(([label,act])=>{
     const b=btn('',act,'action'+(label==='Delete'?' danger':''));b.innerHTML=icon(label);b.append(label);
     if(keys[label]){const k=document.createElement('kbd');k.textContent=keys[label];b.append(k);}
     return b;
