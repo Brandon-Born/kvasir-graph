@@ -51,3 +51,13 @@ test('an edited equation is clipped to the current axes',()=>{
   assert.throws(()=>curve('P = 200',100,80),/no visible segment/);
   assert.throws(()=>curve('P = Q*Q',100,80),/straight-line/);
 });
+
+test('axes grow only as far as a new equation needs',()=>{
+  const {grow}=require('./equations.js');
+  assert.deepEqual(grow(['Qd = 136 - 2P'],150,80),{xmax:150,ymax:80});
+  const wider=grow(['Qd = 236 - 2P'],150,80);
+  assert.ok(wider.xmax>=236&&wider.xmax<=300&&wider.ymax>=118&&wider.ymax<=130,JSON.stringify(wider));
+  // With supply included, the crossing must fit too.
+  const both=grow(['P = 10 + Q','P = 100 - Q'],40,200);
+  assert.ok(both.xmax>=100&&both.ymax===200,JSON.stringify(both));
+});

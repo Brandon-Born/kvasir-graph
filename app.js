@@ -611,10 +611,11 @@ function editObject(o){
   const size=objectFontSize(o);
   const n=o.caption===undefined?labelField('Name',o.name,size):field('Name',o.name);
   const label=o.caption!==undefined?labelField('Label on graph',o.caption,size):null,c=field('Color',color(o),'color');
-  let equation=null;
+  let equation=null,expand=null;
   if(o.kind==='line'){
     equation=field('Equation (optional)',o.equation??'');equation.required=false;equation.placeholder='P = 68 − Q/2';
     equation.title='Enter a straight-line equation in Q and P to redraw this curve exactly.';
+    expand=field('Expand the axes if a new equation runs off the graph','','checkbox');expand.required=false;expand.checked=true;
   }
   let show=null;if(o.kind==='guide'){show=field('Show label on graph','','checkbox');show.required=false;show.checked=!!o.showLabel;}
   const base=scene.resolved.get(o.id).pts,points=base.length<=3?base.map((p,i)=>pointFields(o.kind==='u'?['Left arm','Minimum','Right arm'][i]:base.length===1?'Position':'Endpoint '+(i+1),p)):[];
@@ -624,13 +625,25 @@ function editObject(o){
     if(['line','guide'].includes(o.kind)&&distance(updated[0],updated[1])<.001){notice('Choose two different endpoints.');return false;}
     // A new equation redraws the line; otherwise edited endpoints win and the equation is dropped.
     const text=equation?.value.trim()??'',fromEquation=text&&text!==(o.equation??'');
-    let fitted=null;
-    if(fromEquation){try{fitted=MarketEquations.curve(text,graph().xmax,graph().ymax);}catch(error){notice(error.message);return false;}}
-    commit(()=>{o.name=n.value;o.color=c.value;o.fontSize=(label??n).fontSize;if(label)o.caption=label.value;if(show)o.showLabel=show.checked;
+    const g=graph();let fitted=null,axes={xmax:g.xmax,ymax:g.ymax};
+    if(fromEquation){
+      try{
+        if(expand.checked){
+          // Fit the new line's intercepts, and its crossing when one other equation line exists.
+          const others=g.objects.filter(k=>k!==o&&k.kind==='line'&&k.equation).map(k=>k.equation);
+          axes=MarketEquations.grow(others.length===1?[text,...others]:[text],g.xmax,g.ymax);
+        }
+        fitted=MarketEquations.curve(text,axes.xmax,axes.ymax);
+      }catch(error){notice(error.message);return false;}
+    }
+    const grown=axes.xmax!==g.xmax||axes.ymax!==g.ymax;
+    commit(()=>{
+      if(grown){g.xmax=axes.xmax;g.ymax=axes.ymax;refitEquations(g);}o.name=n.value;o.color=c.value;o.fontSize=(label??n).fontSize;if(label)o.caption=label.value;if(show)o.showLabel=show.checked;
       if(fitted){o.pts=fitted;o.equation=text;return;}
       let moved=false;
       updated.forEach((p,i)=>{if(num(base[i].x)!==num(p.x)||num(base[i].y)!==num(p.y)){o.pts[i]=p;moved=true;}});
       if(moved||!text)delete o.equation;});
+    if(grown)$('hint').textContent='Axes expanded to Quantity 0–'+num(axes.xmax)+' and Price 0–'+num(axes.ymax)+' to fit '+o.name+'.';
   });
 }
 function shiftDialog(o){
@@ -712,13 +725,16 @@ function newGraph(){
     if(added)equilibriumHint(added[2]);
   });
 }
+// Lines entered as equations are redrawn to span the current axes.
+function refitEquations(g){
+  for(const o of g.objects)if(o.kind==='line'&&o.equation){try{o.pts=MarketEquations.curve(o.equation,g.xmax,g.ymax);}catch{}}
+}
 function settings(){
   const g=graph();modal('Axes and scale');
   const x=labelField('Horizontal axis label',g.xlabel,fontSize(g.xFontSize,19)),y=labelField('Vertical axis label',g.ylabel,fontSize(g.yFontSize,19));
   const xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
   xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xFontSize=x.fontSize;g.yFontSize=y.fontSize;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;
-    // Lines entered as equations are redrawn to span the new axes.
-    for(const o of g.objects)if(o.kind==='line'&&o.equation){try{o.pts=MarketEquations.curve(o.equation,g.xmax,g.ymax);}catch{}}}));
+    refitEquations(g);}));
 }
 function graphMenu(){
   const backup=unreadableBackup();
