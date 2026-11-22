@@ -25,9 +25,24 @@ function renderLabel(el,value){
   el.append(value.slice(end));
 }
 function txt(parent,text,x,y,attrs={}){const el=svg('text',{x,y,fill:M.ink,'font-family':'Georgia,serif',...attrs},parent);renderLabel(el,text);return el;}
-let state,storageIssue=false;
-try{const raw=localStorage.getItem(key);if(raw){state=JSON.parse(raw);if(!M.validWorkspace(state))throw Error();}}catch{state=null;storageIssue=true;}
-if(!state){const g=M.demo();state={version:1,graphs:[g],active:g.id};}
+const backupKey=key+'-unreadable';
+let state,storageIssue=false,rawSaved=null;
+// Keep saved data the editor cannot open (damaged, or from a newer version)
+// under a separate key before anything can overwrite it.
+function keepUnreadable(raw){
+  if(!raw)return;
+  try{
+    const previous=localStorage.getItem(backupKey);
+    if(previous===raw)return;
+    if(previous)localStorage.setItem(backupKey+'-'+Date.now(),previous);
+    localStorage.setItem(backupKey,raw);
+  }catch{}
+}
+function unreadableBackup(){try{return localStorage.getItem(backupKey);}catch{return null;}}
+function demoWorkspace(){const g=M.demo();return {version:1,graphs:[g],active:g.id};}
+try{rawSaved=localStorage.getItem(key);if(rawSaved){state=JSON.parse(rawSaved);if(!M.validWorkspace(state))throw Error();}}
+catch{state=null;storageIssue=true;keepUnreadable(rawSaved);}
+if(!state)state=demoWorkspace();
 let selected=null,tool='Select',drawMode='line',guideMode='auto',labelMode='object',shadeGroup=null,start=null,drag=null,hover=null,snapText='',scene,faces,cache=null;
 const undo=[],redo=[], graph=()=>state.graphs.find(g=>g.id===state.active);
 const selectedObj=()=>graph().objects.find(o=>o.id===selected);
@@ -45,9 +60,18 @@ function save(){
   catch{$('saved').textContent='Use Export to save a backup';}
 }
 function remember(snapshot=JSON.stringify(state)){undo.push(snapshot);if(undo.length>80)undo.shift();redo.length=0;}
-function commit(fn){remember();fn();cache=null;save();render();}
+function commit(fn){
+  const snapshot=JSON.stringify(state);remember(snapshot);
+  try{fn();cache=null;render();}
+  catch(error){
+    // Never save a change the editor cannot draw. Restore the previous state.
+    console.error(error);undo.pop();state=JSON.parse(snapshot);resetTools();cache=null;render();
+    $('hint').textContent='That change could not be applied, so it was undone.';return;
+  }
+  save();
+}
 function resetTools(){selected=null;shadeGroup=null;start=null;hover=null;drag=null;tool='Select';}
-function historyMove(from,to){if(!from.length)return;to.push(JSON.stringify(state));state=JSON.parse(from.pop());resetTools();cache=null;save();render();}
+function historyMove(from,to){if(!from.length)return;to.push(JSON.stringify(state));state=JSON.parse(from.pop());resetTools();cache=null;render();save();}
 function getScene(){if(!cache){scene=M.resolve(graph());faces=M.regions(graph(),scene);cache=true;}}
 function labelPosition(o){
   if(o.labelAt)return o.labelAt;
@@ -154,16 +178,35 @@ function openObjectMenu(event,id){
   const rect=event.currentTarget.getBoundingClientRect();
   const x=event.clientX||rect.left,y=event.clientY||rect.top;
   selected=id??null;setTool('Select');
-  const actions=id?objectActions(selectedObj()):[['Axes & scale',settings]];
+  showMenu('Object actions',id?objectActions(selectedObj()):[['Axes & scale',settings]],()=>({x,y}));
+}
+// One popover serves the right-click menu and the Export and ••• buttons.
+let menuOwner=null,menuClosed={owner:null,at:0};
+function showMenu(label,actions,place,owner=null){
+  if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();
+  objectMenu.setAttribute('aria-label',label);
   objectMenu.replaceChildren(...actions.map(([name,act])=>{
     const item=btn(name,()=>{objectMenu.hidePopover();act();});
     item.setAttribute('role','menuitem');return item;
   }));
+  menuOwner=owner;owner?.setAttribute('aria-expanded','true');
   objectMenu.showPopover();
+  const {x,y}=place(objectMenu.offsetWidth);
   objectMenu.style.left=G.clamp(x,6,innerWidth-objectMenu.offsetWidth-6)+'px';
   objectMenu.style.top=G.clamp(y,6,innerHeight-objectMenu.offsetHeight-6)+'px';
   objectMenu.firstElementChild.focus({preventScroll:true});
 }
+function buttonMenu(button,label,actions){
+  // A click on the open menu's own button closes it (light dismiss) instead of reopening it.
+  if(menuClosed.owner===button&&performance.now()-menuClosed.at<400)return;
+  showMenu(label,actions,width=>{const r=button.getBoundingClientRect();return {x:r.right-width,y:r.bottom+4};},button);
+}
+objectMenu.addEventListener('beforetoggle',event=>{
+  if(event.newState!=='closed'||!menuOwner)return;
+  const owner=menuOwner;menuOwner=null;owner.setAttribute('aria-expanded','false');
+  menuClosed={owner,at:performance.now()};
+  if(!document.activeElement||document.activeElement===document.body||objectMenu.contains(document.activeElement))owner.focus({preventScroll:true});
+});
 objectMenu.onkeydown=event=>{
   const items=[...objectMenu.children],index=items.indexOf(document.activeElement);
   const next={ArrowDown:(index+1)%items.length,ArrowUp:(index+items.length-1)%items.length,Home:0,End:items.length-1}[event.key];
@@ -179,7 +222,7 @@ function render(keepObjectRows=false){
   if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();
   const g=graph();document.title=g.name+' · Kvasir Graph';$('title').textContent=g.name;
   $('graphs').replaceChildren(...state.graphs.map(item=>{
-    const b=btn('',()=>{resetTools();state.active=item.id;cache=null;save();render();},'graph'+(item===g?' active':''));b.innerHTML=icon('Graph');b.append(item.name);return b;
+    const b=btn('',()=>{resetTools();state.active=item.id;cache=null;render();save();},'graph'+(item===g?' active':''));b.innerHTML=icon('Graph');b.append(item.name);return b;
   }));
   if(!keepObjectRows)$('objects').replaceChildren(...g.objects.map(o=>{
     const b=btn('',()=>{selected=o.id;setTool('Select',true);},'object');
@@ -303,17 +346,20 @@ plot.ondblclick=event=>{
   else if(event.target.closest('[data-axes]')){event.preventDefault();settings();}
 };
 function addShape(o){
-  // A new boundary may subdivide an existing fill. Keep all its child faces.
-  const existing=graph().objects.filter(x=>x.kind==='region').map(r=>[r,r.pieces.map(p=>M.findFace(p,faces)).filter(Boolean)]);
+  // A new boundary may subdivide an existing fill. Keep all its child faces,
+  // and keep any piece that does not resolve right now so it is never lost.
+  getScene();
+  const existing=graph().objects.filter(x=>x.kind==='region').map(r=>[r,r.pieces.map(p=>[p,M.findFace(p,faces)])]);
   commit(()=>{
     graph().objects.push(o);
     if(existing.length&&['line','guide','free','u'].includes(o.kind)){
-      const fresh=M.regions(graph(),M.resolve(graph()));
-      for(const [region,parents] of existing){
-        const pieces=[];
-        for(const f of fresh){
-          const seed=interior(f);
-          if(parents.some(parent=>G.inside(seed,parent.poly)))pieces.push(M.piece(f,seed));
+      const fresh=M.regions(graph(),M.resolve(graph())).map(f=>({face:f,seed:interior(f)}));
+      for(const [region,parts] of existing){
+        const pieces=[],used=new Set();
+        for(const [old,parent] of parts){
+          const children=parent?fresh.filter(c=>!used.has(c)&&G.inside(c.seed,parent.poly)):[];
+          if(!children.length){pieces.push(old);continue;}
+          for(const c of children){used.add(c);pieces.push(M.piece(c.face,c.seed));}
         }
         region.pieces=pieces;
       }
@@ -446,7 +492,7 @@ plot.onpointerup=event=>{
       const last=snap(position(event),event),pts=G.freehand(end.pts);pts[0]=end.pts[0];pts[pts.length-1]=last;
       addShape(M.shape('free',nextName('Curve'),pts,newColor()));
     }else render();
-  }else if(end.moved){remember(end.snapshot);cache=null;save();render();}
+  }else if(end.moved){remember(end.snapshot);cache=null;render();save();}
 };
 plot.onpointercancel=()=>{if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}if(drag?.type==='guide')start=null;drag=null;hover=null;render();};
 plot.onpointerleave=()=>{if(!drag){hover=null;snapText='';renderPreview();}};
@@ -558,9 +604,6 @@ function deleteSelected(){
     selected=null;if(tool==='Move label')tool='Select';
   });
 }
-function menu(title,items){
-  modal(title);for(const [name,fn] of items)fields.append(btn(name,()=>{dialog.close();fn();},'menuitem'));
-}
 function newGraph(){
   modal('New graph');
   const title=field('Graph title','Untitled graph');
@@ -619,11 +662,14 @@ function settings(){
   const xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
   xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xFontSize=x.fontSize;g.yFontSize=y.fontSize;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;}));
 }
-function graphMenu(){menu('Graph actions',[
+function graphMenu(){
+  const backup=unreadableBackup();
+  buttonMenu($('graph-menu'),'Graph actions',[
   ['Rename graph',()=>{modal('Rename graph');const n=field('Graph title',graph().name);submit('Rename',()=>commit(()=>graph().name=n.value));}],
   ['Duplicate graph',()=>commit(()=>{const g=clone(graph());g.id=M.id();g.name+=' (copy)';state.graphs.push(g);state.active=g.id;resetTools();})],
   ['Open workspace backup',()=>$('import').click()],
-  ['Delete graph',()=>{modal('Delete graph?');notice('Remove “'+graph().name+'” from this workspace. You can undo this change.');submit('Delete graph',()=>commit(()=>{state.graphs=state.graphs.filter(g=>g.id!==state.active);if(!state.graphs.length)state.graphs.push(M.blank());state.active=state.graphs[0].id;resetTools();}));}]
+  ['Delete graph',()=>{modal('Delete graph?');notice('Remove “'+graph().name+'” from this workspace. You can undo this change.');submit('Delete graph',()=>commit(()=>{state.graphs=state.graphs.filter(g=>g.id!==state.active);if(!state.graphs.length)state.graphs.push(M.blank());state.active=state.graphs[0].id;resetTools();}));}],
+  ...(backup?[['Download unopened saved data',()=>download(new Blob([backup],{type:'application/json'}),' (unopened data).json')]]:[])
 ]);}
 function download(blob,suffix){
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
@@ -652,7 +698,7 @@ async function exportPng(copy){
     download(await promise,'.png');$('hint').textContent=copy?'Clipboard unavailable. Saved a PNG for Word.':'PNG exported.';
   }catch{$('hint').textContent='PNG export failed. Use Download SVG or Print to PDF.';}
 }
-$('export').onclick=()=>menu('Export',[
+$('export').onclick=()=>buttonMenu($('export'),'Export',[
   ['Copy graph for Word',()=>exportPng(true)],['Download PNG',()=>exportPng(false)],['Download SVG',()=>download(vectorBlob(),'.svg')],['Print or save PDF',()=>window.print()],
   ['Save editable workspace',()=>download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),'.kvasir.json')]
 ]);
@@ -669,7 +715,12 @@ document.addEventListener('keydown',e=>{
   if(dialog.open||e.target.matches('input,select,textarea'))return;
   if(e.key==='Escape'){if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}setTool('Select');return;}
   if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();const back=e.key.toLowerCase()==='z'&&!e.shiftKey;historyMove(back?undo:redo,back?redo:undo);}
-  if(e.key==='Delete'&&tool==='Select')deleteSelected();
+  if((e.key==='Delete'||e.key==='Backspace')&&tool==='Select'&&selected){e.preventDefault();deleteSelected();}
 });
-render();
-if(storageIssue)$('saved').textContent='Storage unavailable or unreadable';else save();
+try{render();}
+catch(error){
+  // Saved data passed validation but still cannot be drawn. Keep a copy and start fresh.
+  console.error(error);keepUnreadable(rawSaved);storageIssue=true;state=demoWorkspace();cache=null;render();
+}
+if(storageIssue)$('saved').textContent=unreadableBackup()?'Saved data could not be opened. A copy was kept (••• menu).':'Storage unavailable or unreadable';
+else save();

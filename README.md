@@ -21,8 +21,8 @@ When naming a point, curve, axis, area, or free-text label, use **Size (px)** to
 
 The browser saves edits on this device. **Export → Save editable workspace** downloads all graphs as JSON and lets you move them between browsers or computers. **••• → Open workspace backup** adds the saved graphs to the current workspace.
 
-Use **Export → Copy graph for Word** or **Download PNG** to insert a figure into the assignment. SVG is available for vector graphics. **Print or save PDF** prints the active graph. Keyboard shortcuts include Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Delete, and Escape.
+Use **Export → Copy graph for Word** or **Download PNG** to insert a figure into the assignment. SVG is available for vector graphics. **Print or save PDF** prints the active graph. Keyboard shortcuts include Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Delete or Backspace, and Escape. If saved data on this device can't be opened, the editor keeps a copy and **••• → Download unopened saved data** retrieves it.
 
 ## Source
 
-The editor uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **app.js** implements drawing, editing, persistence, and export. Run the geometry regression checks with `node --test geometry.test.js`.
+The editor uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **app.js** implements drawing, editing, persistence, and export. Run the regression checks with `node --test`.
