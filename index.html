@@ -1,16 +1,16 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kvasir Graph · Economics graph editor</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<header><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/></svg>Kvasir Graph</div><span id="saved">Local workspace</span><div class="head-actions"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button><button id="export" class="primary">Export ▾</button></div></header>
+<header><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/></svg>Kvasir Graph</div><span id="saved">Local workspace</span><div class="head-actions"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button><button id="export" class="primary" aria-haspopup="menu" aria-expanded="false">Export ▾</button></div></header>
 <div class="layout"><aside>
 <section><h2>Graphs</h2><button id="new" class="wide outline">＋ New graph</button><div id="graphs"></div></section>
 <section><h2>Graph objects</h2><div id="objects"></div><div id="inspector"></div></section>
 <section><h2>Graph options</h2><label class="switch">Grid<input id="grid" type="checkbox"></label><label class="switch">Snap to geometry<input id="snap" type="checkbox"></label><button id="settings" class="wide subtle">Axes &amp; scale</button></section>
 </aside>
-<main><div class="heading"><h1 id="title"></h1><button id="graph-menu" title="Graph actions" aria-label="Graph actions">•••</button></div>
+<main><div class="heading"><h1 id="title"></h1><button id="graph-menu" title="Graph actions" aria-label="Graph actions" aria-haspopup="menu" aria-expanded="false">•••</button></div>
 <div class="sheet"><div id="toolbar" role="toolbar" aria-label="Drawing tools"></div><div id="options"></div>
-<svg id="plot" viewBox="0 0 900 535" aria-label="Editable price and quantity diagram" tabindex="0" xmlns="http://www.w3.org/2000/svg"></svg></div>
 <div class="status"><span id="hint" role="status"></span><span id="coords">Q — &nbsp; P —</span></div>
+<svg id="plot" viewBox="0 0 900 535" aria-label="Editable price and quantity diagram" tabindex="0" xmlns="http://www.w3.org/2000/svg"></svg></div>
 </main></div>
 <div id="object-menu" role="menu" aria-label="Object actions" popover="auto"></div>
 <dialog id="dialog"><form id="form"><div class="dialog-title"><h2 id="dialog-title"></h2><button type="button" id="close" aria-label="Close">×</button></div><div id="fields"></div><div id="form-actions"></div></form></dialog>

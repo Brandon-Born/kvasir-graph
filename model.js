@@ -77,15 +77,27 @@ const Model = (() => {
     }
     return g;
   }
+  // Check every field the editor reads, so a damaged or hand-edited backup is
+  // rejected up front instead of breaking rendering after it has been saved.
   function validWorkspace(w){
     const kinds=['line','guide','free','u','point','label','region'];
-    const finite=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
-    return w?.version===1&&Array.isArray(w.graphs)&&w.graphs.length>0&&w.graphs.some(g=>g.id===w.active)&&w.graphs.every(g=>
-      typeof g.id==='string'&&typeof g.name==='string'&&Number.isFinite(g.xmax)&&g.xmax>0&&Number.isFinite(g.ymax)&&g.ymax>0&&
-      typeof g.xlabel==='string'&&typeof g.ylabel==='string'&&Array.isArray(g.objects)&&g.objects.every(o=>
-      typeof o.id==='string'&&typeof o.name==='string'&&kinds.includes(o.kind)&&Array.isArray(o.pts)&&o.pts.every(finite)&&
-      (o.kind==='region'?Array.isArray(o.pieces)&&o.pieces.every(p=>finite(p.seed)):o.kind==='u'?o.pts.length===3:
-      ['point','label'].includes(o.kind)?o.pts.length===1:o.pts.length>=2)));
+    const str=v=>typeof v==='string', num=Number.isFinite;
+    const optional=(v,check)=>v==null||check(v);
+    const finite=p=>p!==null&&typeof p==='object'&&num(p.x)&&num(p.y);
+    const ref=r=>r!==null&&typeof r==='object'&&str(r.a)&&optional(r.b,str)&&optional(r.t,num);
+    const point=p=>finite(p)&&optional(p.ref,ref);
+    const count=o=>o.kind==='u'?o.pts.length===3:['point','label'].includes(o.kind)?o.pts.length===1:
+      o.kind==='region'||o.pts.length>=2;
+    const object=o=>o!==null&&typeof o==='object'&&str(o.id)&&str(o.name)&&kinds.includes(o.kind)&&
+      Array.isArray(o.pts)&&o.pts.every(point)&&count(o)&&
+      optional(o.caption,str)&&optional(o.color,str)&&optional(o.orientation,str)&&
+      optional(o.fontSize,num)&&optional(o.sourceEnd,num)&&optional(o.labelAt,finite)&&
+      (o.kind!=='region'||Array.isArray(o.pieces)&&o.pieces.every(p=>p!==null&&typeof p==='object'&&finite(p.seed)&&str(p.signature)));
+    const graph=g=>g!==null&&typeof g==='object'&&str(g.id)&&str(g.name)&&num(g.xmax)&&g.xmax>0&&num(g.ymax)&&g.ymax>0&&
+      str(g.xlabel)&&str(g.ylabel)&&optional(g.xFontSize,num)&&optional(g.yFontSize,num)&&
+      Array.isArray(g.objects)&&g.objects.every(object);
+    return w?.version===1&&Array.isArray(w.graphs)&&w.graphs.length>0&&w.graphs.some(g=>g?.id===w.active)&&w.graphs.every(graph);
   }
   return {id,shape,blank,resolve,regions,findFace,piece,demo,validWorkspace,teal,orange,ink};
 })();
+if(typeof module!=='undefined') module.exports=Model;
