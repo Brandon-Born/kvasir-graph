@@ -158,7 +158,7 @@ function renderPreview(){
     txt(el,snapText,G.clamp(x+11,25,720),Math.max(18,y-12),{'font-family':'Segoe UI,sans-serif','font-size':13,fill:M.teal,'paint-order':'stroke',stroke:'white','stroke-width':4});
   }
 }
-const hints={Select:'Select an object to edit it. Drag a label to reposition it.',Draw:'Click two endpoints, or enter exact coordinates.',Point:'Click to mark a point. Hold Alt to pause snapping.',Guide:'Click a starting point, then the end of your guide.',Shade:'Click inside a bounded area to shade it.',Label:'Click a curve or area to name it, or click empty space to add text.'};
+const hints={Select:'Select an object to edit it (Enter). Drag it or use the arrow keys to move it.',Draw:'Click two endpoints, or enter exact coordinates.',Point:'Click to mark a point, or enter coordinates. Hold Alt to pause snapping.',Guide:'Click a starting point, then the end of your guide, or enter coordinates.',Shade:'Click inside a bounded area to shade it.',Label:'Click a curve or area to name it, or click empty space to add text.'};
 const faceAt=p=>faces.filter(f=>G.inside(p,f.poly)).sort((a,b)=>a.area-b.area)[0];
 function setTool(name,keepObjectRows=false){tool=name;start=null;hover=null;drag=null;snapText='';shadeGroup=null;render(keepObjectRows);}
 function objectActions(o){
@@ -259,6 +259,9 @@ function renderSelection(){
 }
 function render(keepObjectRows=false){
   if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();
+  // The tool bars are rebuilt below; keep keyboard focus on the same button.
+  const focused=document.activeElement,bar=focused?.closest?.('#toolbar,#options,#graphs');
+  const refocus=bar?{bar:bar.id,label:focused.textContent}:null;
   const g=graph();document.title=g.name+' · Kvasir Graph';$('title').textContent=g.name;
   $('graphs').replaceChildren(...state.graphs.map(item=>{
     const b=btn('',()=>{resetTools();state.active=item.id;cache=null;render();save();},'graph'+(item===g?' active':''));b.innerHTML=icon('Graph');b.append(item.name);return b;
@@ -281,12 +284,20 @@ function render(keepObjectRows=false){
     for(const [k,v] of [['line','Straight line'],['u','U-shaped'],['free','Freehand']])opts.append(btn(v,()=>{drawMode=k;setTool('Draw');},k===drawMode?'active':''));
     if(drawMode==='line')opts.append(btn('Enter coordinates',()=>exactLine()));
   }
-  if(tool==='Guide')for(const [k,v] of [['auto','Auto'],['h','Horizontal'],['v','Vertical'],['free','Any angle']])opts.append(btn(v,()=>{guideMode=k;setTool('Guide');},guideMode===k?'active':''));
-  if(tool==='Label')for(const [k,v] of [['object','Object label'],['text','Free text']])opts.append(btn(v,()=>{labelMode=k;setTool('Label');},labelMode===k?'active':''));
+  if(tool==='Guide'){
+    for(const [k,v] of [['auto','Auto'],['h','Horizontal'],['v','Vertical'],['free','Any angle']])opts.append(btn(v,()=>{guideMode=k;setTool('Guide');},guideMode===k?'active':''));
+    opts.append(btn('Enter coordinates',exactGuides));
+  }
+  if(tool==='Label'){
+    for(const [k,v] of [['object','Object label'],['text','Free text']])opts.append(btn(v,()=>{labelMode=k;setTool('Label');},labelMode===k?'active':''));
+    if(labelMode==='text')opts.append(btn('Enter coordinates',exactLabel));
+  }
+  if(tool==='Point')opts.append(btn('Enter coordinates',exactPoint));
   $('hint').textContent=start?'Click the second endpoint. Esc cancels.':tool==='Draw'&&drawMode==='u'?'Click to place the minimum. Drag either arm to reshape.':tool==='Draw'&&drawMode==='free'?'Drag to sketch a smooth curve.':hints[tool];
   if(tool==='Move label')$('hint').textContent='Click where the label should appear. Esc cancels.';
-  if(tool==='Guide'&&guideMode==='auto')$('hint').textContent=start?'Move near the P or Q axis, then click or release to place the guide.':'Click or drag from an intersection toward the P or Q axis.';
+  if(tool==='Guide'&&guideMode==='auto')$('hint').textContent=start?'Move near the P or Q axis, then click or release to place the guide.':'Click or drag from an intersection toward the P or Q axis, or enter coordinates.';
   plot.style.cursor=tool==='Move label'?'crosshair':'';
+  if(refocus)[...$(refocus.bar).querySelectorAll('button')].find(b=>b.textContent===refocus.label)?.focus({preventScroll:true});
   renderPlot();
 }
 function graphPosition(x,y){return {x:(x-box.x)*graph().xmax/box.w,y:(box.y+box.h-y)*graph().ymax/box.h};}
@@ -624,6 +635,42 @@ function exactLine(){
   const c=field('Color',newColor(),'color');
   submit('Add line',()=>{if(distance(a(),b())<.001){notice('Choose two different endpoints.');return false;}addShape({...M.shape('line',name.value,[a(),b()],c.value),fontSize:name.fontSize});});
 }
+function exactPoint(){
+  modal('Mark a point');const name=labelField('Label','E');
+  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=field('Color',M.ink,'color');
+  submit('Add point',()=>{addShape({...M.shape('point',name.value.trim()||'E',[at()],c.value),fontSize:name.fontSize});});
+}
+function exactLabel(){
+  modal('Place text');const name=labelField('Text','Label');
+  const at=pointFields('Position',{x:graph().xmax/2,y:graph().ymax/2}),c=field('Color',M.ink,'color');
+  submit('Add text',()=>{addShape({...M.shape('label',name.value.trim()||'Label',[at()],c.value),fontSize:name.fontSize});});
+}
+function exactGuides(){
+  modal('Add guides to the axes');
+  const points=graph().objects.filter(o=>o.kind==='point');
+  const label=document.createElement('label'),from=document.createElement('select');
+  label.textContent='From';
+  points.forEach((o,i)=>from.add(new Option(o.name.replace(/_\{([^{}]+)\}/g,'$1'),i)));
+  from.add(new Option('Coordinates','coords'));
+  label.append(from);fields.append(label);
+  const coords=document.createElement('div');fields.append(coords);
+  const pair=document.createElement('div');pair.className='pair';coords.append(pair);
+  const x=field('Q',num(graph().xmax/2),'number',pair),y=field('P',num(graph().ymax/2),'number',pair);
+  const h=field('Horizontal guide to the P axis','','checkbox'),v=field('Vertical guide to the Q axis','','checkbox');
+  h.required=v.required=false;h.checked=v.checked=true;
+  const sync=()=>{coords.hidden=from.value!=='coords';x.disabled=y.disabled=coords.hidden;};
+  from.onchange=sync;sync();
+  submit('Add guides',()=>{
+    if(!h.checked&&!v.checked){notice('Choose at least one guide.');return false;}
+    const point=from.value==='coords'?null:points[from.value];
+    // From a marked point, start where it is drawn now and keep its anchor.
+    const e=point?{...scene.resolved.get(point.id).pts[0],...(point.pts[0].ref?{ref:point.pts[0].ref}:{})}:{x:x.valueAsNumber,y:y.valueAsNumber};
+    const suffix=point&&point.name!=='E'?' '+point.name:'';
+    const added=M.guides(graph(),e,suffix,{h:h.checked,v:v.checked});
+    const parts=regionParts();
+    commit(()=>{graph().objects.push(...added);repiece(parts);resetTools();selected=added.at(-1).id;});
+  });
+}
 function editObject(o){
   modal('Edit '+(o.kind==='region'?'area':o.kind==='u'?'U-shaped curve':o.kind==='free'?'curve':o.kind));
   const size=objectFontSize(o);
@@ -827,7 +874,36 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){cancelScheduledRender();if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}setTool('Select');return;}
   if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();const back=e.key.toLowerCase()==='z'&&!e.shiftKey;historyMove(back?undo:redo,back?redo:undo);}
   if((e.key==='Delete'||e.key==='Backspace')&&tool==='Select'&&selected){e.preventDefault();deleteSelected();}
+  const arrow={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,1],ArrowDown:[0,-1]}[e.key];
+  if(arrow&&tool==='Select'&&selected&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();nudge(arrow[0],arrow[1],e.shiftKey);}
+  if(e.key==='Enter'&&tool==='Select'&&selected&&(e.target===plot||e.target.closest?.('#objects'))){e.preventDefault();editObject(selectedObj());}
 });
+// Arrow keys move the selected object (or an area's label) by a tenth of a
+// grid step, or a whole step with Shift, so round values stay round. A run of
+// presses undoes as one step.
+let lastNudge=0;
+const round=v=>Number(v.toPrecision(12));
+function nudge(dx,dy,big){
+  const o=selectedObj();
+  if(!o||o.kind==='guide')return;
+  getScene();
+  const g=graph(),scale=big?1:.1,now=performance.now();
+  const ux=dx*tickStep(g.xmax,10)*scale,uy=dy*tickStep(g.ymax,8)*scale;
+  const parts=o.kind==='region'?[]:regionParts();
+  if(now-lastNudge>800)remember();
+  lastNudge=now;
+  if(o.kind==='region'){
+    const p=o.labelAt||labelPosition(o);
+    if(!p)return;
+    o.labelAt={x:round(p.x+ux),y:round(p.y+uy)};
+  }else{
+    o.pts=scene.resolved.get(o.id).pts.map(p=>({x:round(p.x+ux),y:round(p.y+uy)}));
+    delete o.equation;
+    if(o.labelAt)o.labelAt={x:o.labelAt.x+ux,y:o.labelAt.y+uy};
+  }
+  repiece(parts);cache=null;render(true);save();
+  if(['point','label'].includes(o.kind))$('hint').textContent=o.name.replace(/_\{([^{}]+)\}/g,'$1')+' moved to Q = '+num(o.pts[0].x)+', P = '+num(o.pts[0].y)+'. Shift moves farther.';
+}
 try{render();}
 catch(error){
   // Saved data passed validation but still cannot be drawn. Keep a copy and start fresh.
