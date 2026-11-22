@@ -51,6 +51,23 @@ const Geometry = (() => {
     }
     out.push(points.at(-1));return out;
   }
+  // Drop points that lie within `tolerance` of the simplified line
+  // (Ramer-Douglas-Peucker), measured after scaling x by sx and y by sy.
+  function simplify(points, tolerance, sx=1, sy=1) {
+    if(points.length<3) return points.slice();
+    const keep=new Uint8Array(points.length), stack=[[0,points.length-1]];
+    keep[0]=keep[points.length-1]=1;
+    while(stack.length){
+      const [first,last]=stack.pop();
+      let worst=0, index=-1;
+      for(let i=first+1;i<last;i++){
+        const gap=nearest(points[i],[points[first],points[last]],sx,sy).distance;
+        if(gap>worst){worst=gap;index=i;}
+      }
+      if(index>=0&&worst>tolerance){keep[index]=1;stack.push([first,index],[index,last]);}
+    }
+    return points.filter((_,i)=>keep[i]);
+  }
   function frame(x,y) {
     const corners=[{x:0,y:0},{x,y:0},{x,y},{x:0,y}];
     return ['@quantity','@right','@top','@price'].map((id,i)=>({id,points:[corners[i],corners[(i+1)%4]]}));
@@ -78,9 +95,16 @@ const Geometry = (() => {
       const a=points[i-1],b=points[i];
       if(!near(a,b))segments.push({id,a,b,cuts:[a,b]});
     }
-    for(let i=0;i<segments.length;i++)for(let j=i+1;j<segments.length;j++){
-      const s=segments[i],t=segments[j];
-      for(const p of hits(s.a,s.b,t.a,t.b)){s.cuts.push(p);t.cuts.push(p);}
+    // Sweep along x: only segments whose x ranges overlap can cross, which keeps
+    // long freehand strokes from costing a comparison against every segment.
+    for(const s of segments){s.lo=Math.min(s.a.x,s.b.x);s.hi=Math.max(s.a.x,s.b.x);}
+    const order=segments.slice().sort((u,v)=>u.lo-v.lo);
+    for(let i=0;i<order.length;i++){
+      const s=order[i];
+      for(let j=i+1;j<order.length&&order[j].lo<=s.hi+EPS;j++){
+        const t=order[j];
+        for(const p of hits(s.a,s.b,t.a,t.b)){s.cuts.push(p);t.cuts.push(p);}
+      }
     }
     const vertices=new Map(),edges=[];
     function vertex(p){
@@ -117,6 +141,6 @@ const Geometry = (() => {
     }
     return result;
   }
-  return {curve,freehand,frame,faces,nearest,crossings,inside,clamp,lerp};
+  return {curve,freehand,simplify,frame,faces,nearest,crossings,inside,clamp,lerp};
 })();
 if(typeof module!=='undefined') module.exports=Geometry;

@@ -384,27 +384,38 @@ plot.ondblclick=event=>{
   if(o){event.preventDefault();editObject(o);}
   else if(event.target.closest('[data-axes]')){event.preventDefault();settings();}
 };
-function addShape(o){
-  // A new boundary may subdivide an existing fill. Keep all its child faces,
-  // and keep any piece that does not resolve right now so it is never lost.
+// Each shaded area's pieces with the faces they cover right now.
+function regionParts(){
   getScene();
-  const existing=graph().objects.filter(x=>x.kind==='region').map(r=>[r,r.pieces.map(p=>[p,M.findFace(p,faces)])]);
-  commit(()=>{
-    graph().objects.push(o);
-    if(existing.length&&['line','guide','free','u'].includes(o.kind)){
-      const fresh=M.regions(graph(),M.resolve(graph())).map(f=>({face:f,seed:interior(f)}));
-      for(const [region,parts] of existing){
-        const pieces=[],used=new Set();
-        for(const [old,parent] of parts){
-          const children=parent?fresh.filter(c=>!used.has(c)&&G.inside(c.seed,parent.poly)):[];
-          if(!children.length){pieces.push(old);continue;}
-          for(const c of children){used.add(c);pieces.push(M.piece(c.face,c.seed));}
-        }
-        region.pieces=pieces;
-      }
+  return graph().objects.filter(x=>x.kind==='region').map(r=>[r,r.pieces.map(p=>[p,M.findFace(p,faces)])]);
+}
+// After curves change, a piece whose face was split or reshaped by a new
+// boundary covers every face that now sits inside the old one. A piece whose
+// face kept its boundaries, or that does not resolve, is kept as it is.
+function repiece(parts){
+  if(!parts.length)return;
+  const now=M.regions(graph(),M.resolve(graph())),fresh=now.map(f=>({face:f,seed:interior(f)}));
+  for(const [region,pieceParts] of parts){
+    const pieces=[],used=new Set();
+    for(const [old,parent] of pieceParts){
+      const same=parent&&M.findFace(old,now)?.signature===parent.signature;
+      const children=parent&&!same?fresh.filter(c=>!used.has(c)&&G.inside(c.seed,parent.poly)):[];
+      if(!children.length){pieces.push(old);continue;}
+      for(const c of children){used.add(c);pieces.push(M.piece(c.face,c.seed));}
     }
-    resetTools();selected=o.id;
-  });
+    // Pieces that now cover the same face (a split healed by moving a curve away) merge.
+    const covered=new Set();
+    region.pieces=pieces.filter(piece=>{
+      const face=M.findFace(piece,now);
+      if(!face)return true;
+      if(covered.has(face))return false;
+      covered.add(face);return true;
+    });
+  }
+}
+function addShape(o){
+  const parts=['line','guide','free','u'].includes(o.kind)?regionParts():[];
+  commit(()=>{graph().objects.push(o);repiece(parts);resetTools();selected=o.id;});
 }
 function interior(f){
   if(G.inside(f.center,f.poly))return f.center;
@@ -445,7 +456,8 @@ plot.onpointerdown=event=>{
       const label=text&&obj.kind!=='label';
       const labelOrigin=label?graphPosition(Number(text.getAttribute('x')),Number(text.getAttribute('y'))):null;
       const type=idx>=0?'handle':label||obj.kind==='region'?'caption':'move';
-      drag={type,idx,labelOrigin,raw:type==='caption'?raw:position(event),snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
+      const parts=type!=='caption'&&obj.kind!=='region'?regionParts():[];
+      drag={type,idx,labelOrigin,parts,raw:type==='caption'?raw:position(event),snapshot:JSON.stringify(state),base:clone(obj),original:clone(selectedObj()),moved:false};
       plot.setPointerCapture(event.pointerId);
     }else selected=null;
     renderSelection();renderHandles();return;
@@ -514,7 +526,7 @@ plot.onpointermove=event=>{
       delete o.equation;o.pts=base.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
       if(base.labelAt)o.labelAt={x:base.labelAt.x+dx,y:base.labelAt.y+dy};
     }
-    cache=null;renderPlot();return;
+    cache=null;scheduleRender();return;
   }
   const showSnap=!['Select','Shade','Move label'].includes(tool);
   hover=showSnap?snap(raw,event):raw;
@@ -529,12 +541,18 @@ plot.onpointerup=event=>{
     renderPreview();
   }else if(end.type==='free'){
     if(end.pts.length>=2){
-      const last=snap(position(event),event),pts=G.freehand(end.pts);pts[0]=end.pts[0];pts[pts.length-1]=last;
+      const last=snap(position(event),event),smooth=G.freehand(end.pts);smooth[0]=end.pts[0];smooth[smooth.length-1]=last;
+      // Keep the stroke within 0.4 px of the smoothed curve with far fewer points.
+      const pts=G.simplify(smooth,.4,box.w/graph().xmax,box.h/graph().ymax);
       addShape(M.shape('free',nextName('Curve'),pts,newColor()));
     }else render();
-  }else if(end.moved){remember(end.snapshot);cache=null;render();save();}
+  }else if(end.moved){cancelScheduledRender();repiece(end.parts);remember(end.snapshot);cache=null;render();save();}
 };
-plot.onpointercancel=()=>{if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}if(drag?.type==='guide')start=null;drag=null;hover=null;render();};
+// Draw at most once per frame while dragging; pointer events can arrive faster.
+let frameRequest=0;
+function scheduleRender(){if(!frameRequest)frameRequest=requestAnimationFrame(()=>{frameRequest=0;renderPlot();});}
+function cancelScheduledRender(){if(frameRequest){cancelAnimationFrame(frameRequest);frameRequest=0;}}
+plot.onpointercancel=()=>{cancelScheduledRender();if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}if(drag?.type==='guide')start=null;drag=null;hover=null;render();};
 plot.onpointerleave=()=>{if(!drag){hover=null;snapText='';renderPreview();}};
 
 const dialog=$('dialog'),form=$('form'),fields=$('fields');
@@ -787,7 +805,7 @@ $('grid').onchange=()=>commit(()=>graph().grid=$('grid').checked);$('snap').onch
 $('undo').onclick=()=>historyMove(undo,redo);$('redo').onclick=()=>historyMove(redo,undo);
 document.addEventListener('keydown',e=>{
   if(dialog.open||e.target.matches('input,select,textarea'))return;
-  if(e.key==='Escape'){if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}setTool('Select');return;}
+  if(e.key==='Escape'){cancelScheduledRender();if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}setTool('Select');return;}
   if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();const back=e.key.toLowerCase()==='z'&&!e.shiftKey;historyMove(back?undo:redo,back?redo:undo);}
   if((e.key==='Delete'||e.key==='Backspace')&&tool==='Select'&&selected){e.preventDefault();deleteSelected();}
 });
