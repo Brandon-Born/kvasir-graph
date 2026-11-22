@@ -83,11 +83,16 @@ const Model = (() => {
     if(!first||!second)return null;
     const p=G.crossings(first,second).find(q=>q.x>=0&&q.y>=0&&q.x<=graph.xmax&&q.y<=graph.ymax);
     if(!p)return null;
-    const e={x:p.x,y:p.y,ref:{a,b}},suffix=name==='E'?'':' '+name;
-    const h=shape('guide','Price guide'+suffix,[{x:0,y:p.y,ref:{a:'@price',t:1-p.y/graph.ymax}},{...e}],ink);
-    const v=shape('guide','Quantity guide'+suffix,[{x:p.x,y:0,ref:{a:'@quantity',t:p.x/graph.xmax}},{...e}],ink);
-    h.orientation='h';v.orientation='v';h.sourceEnd=v.sourceEnd=1;
-    return [h,v,shape('point',name,[{...e}],ink)];
+    const e={x:p.x,y:p.y,ref:{a,b}};
+    return [...guides(graph,e,name==='E'?'':' '+name),shape('point',name,[{...e}],ink)];
+  }
+  // Dashed guides from point e to the price axis (h) and the quantity axis (v).
+  // They stay horizontal or vertical and follow e when it is anchored.
+  function guides(graph,e,suffix='',{h=true,v=true}={}){
+    const out=[];
+    if(h){const g=shape('guide','Price guide'+suffix,[{x:0,y:e.y,ref:{a:'@price',t:1-e.y/graph.ymax}},{...e}],ink);g.orientation='h';g.sourceEnd=1;out.push(g);}
+    if(v){const g=shape('guide','Quantity guide'+suffix,[{x:e.x,y:0,ref:{a:'@quantity',t:e.x/graph.xmax}},{...e}],ink);g.orientation='v';g.sourceEnd=1;out.push(g);}
+    return out;
   }
   function validWorkspace(w){
     const kinds=['line','guide','free','u','point','label','region'];
@@ -108,6 +113,6 @@ const Model = (() => {
       Array.isArray(g.objects)&&g.objects.every(object);
     return w?.version===1&&Array.isArray(w.graphs)&&w.graphs.length>0&&w.graphs.some(g=>g?.id===w.active)&&w.graphs.every(graph);
   }
-  return {id,shape,blank,resolve,regions,findFace,piece,demo,equilibrium,validWorkspace,teal,orange,ink};
+  return {id,shape,blank,resolve,regions,findFace,piece,demo,equilibrium,guides,validWorkspace,teal,orange,ink};
 })();
 if(typeof module!=='undefined') module.exports=Model;
