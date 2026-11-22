@@ -30,3 +30,18 @@ test('A U-shaped curve keeps its minimum at the editable middle handle',()=>{
   assert.deepEqual(pts.reduce((low,p)=>p.y<low.y?p:low),min);
   assert.ok(pts.every((p,i)=>!i||p.x>pts[i-1].x));
 });
+
+test('simplify keeps a stroke within tolerance using far fewer points',()=>{
+  const raw=[];for(let i=0;i<300;i++)raw.push({x:i*.5,y:40+20*Math.sin(i/20)});
+  const smooth=G.freehand(raw),sx=755/150,sy=409/80,slim=G.simplify(smooth,.4,sx,sy);
+  assert.ok(slim.length<smooth.length/10,slim.length+' of '+smooth.length);
+  assert.equal(slim[0],smooth[0]);assert.equal(slim.at(-1),smooth.at(-1));
+  for(const p of smooth)assert.ok(G.nearest(p,slim,sx,sy).distance<=.4+1e-9);
+});
+
+test('faces are unchanged by the sweep over long crossing strokes',()=>{
+  const wave=(k,dy)=>({id:'w'+k,points:G.freehand(Array.from({length:120},(_,i)=>({x:i*1.25,y:40+dy+15*Math.sin(i/9+k)})))});
+  const faces=G.faces([...G.frame(150,80),wave(0,0),wave(1,5),wave(2,-5)],150,80);
+  close(faces.reduce((sum,f)=>sum+f.area,0),150*80);
+  assert.ok(faces.length>10);
+});
