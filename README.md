@@ -36,4 +36,4 @@ The editor uses native SVG and browser pointer events. **geometry.js** splits cu
 - **export.js**: PNG, SVG, clipboard, print, backup, and import
 - **main.js**: control wiring, tab sync, keyboard shortcuts, and startup
 
- Run the regression checks with `node --test`. The browser smoke test drives the editor in headless Chromium: `npm install --no-save playwright` once, then `node e2e/smoke.mjs`. GitHub Actions runs both on every push and pull request.
+Run the regression checks with `node --test`. The browser smoke test drives the editor in headless Chromium: `npm install --no-save playwright` once, then `node e2e/smoke.mjs`. GitHub Actions runs both on every push and pull request.
