@@ -89,12 +89,9 @@ const MarketEquations = (() => {
     if (line.q) { include(quantityAt(line,0),0); include(quantityAt(line,ymax),ymax); }
     return pts.sort((a,b)=>a.x-b.x || a.y-b.y);
   }
-  function fit(entries) {
-    const lines = entries.filter(e=>e.text.trim()).map(({name,text})=>{
-      try {return {name,...parse(text)};}
-      catch(error) {throw Error(name+': '+error.message);}
-    });
-    if (!lines.length) throw Error('Enter a supply or demand equation.');
+  // The largest quantity and price the lines need: their intercepts and, for
+  // two lines, their crossing.
+  function extent(lines) {
     const quantities = [], prices = [];
     function landmark(x,y) {
       if (x>=0 && y>=0 && Number.isFinite(x) && Number.isFinite(y)) {
@@ -121,15 +118,37 @@ const MarketEquations = (() => {
       x *= 2;
       y = Math.max(0,...lines.filter(l=>l.p).map(l=>priceAt(l,x)));
     }
+    return {x,y};
+  }
+  function fit(entries) {
+    const lines = entries.filter(e=>e.text.trim()).map(({name,text})=>{
+      try {return {name,text:text.trim(),...parse(text)};}
+      catch(error) {throw Error(name+': '+error.message);}
+    });
+    if (!lines.length) throw Error('Enter a supply or demand equation.');
+    const {x,y} = extent(lines);
     const xmax = ceiling(x||10), ymax = ceiling(y||10);
     if (![xmax,ymax].every(v=>Number.isFinite(v)&&v>0)) throw Error('These values exceed the graph scale.');
     const curves = lines.map(line=>{
       const pts = segment(line,xmax,ymax);
       if (pts.length!==2) throw Error(line.name+': the line needs a visible segment at nonnegative price and quantity.');
-      return {name:line.name,pts};
+      return {name:line.name,text:line.text,pts};
     });
     return {xmax,ymax,curves};
   }
-  return {fit};
+  // Clip one equation to the current axes, for editing a curve's equation or
+  // refitting it after the axes change.
+  function curve(text,xmax,ymax) {
+    const pts = segment(parse(text),xmax,ymax);
+    if (pts.length!==2) throw Error('This line has no visible segment on the current axes. Widen them in Axes & scale.');
+    return pts;
+  }
+  // Axes that keep the current limits but grow to show every given equation.
+  function grow(texts,xmax,ymax) {
+    const {x,y} = extent(texts.map(parse));
+    const need = (value,limit) => value>limit*(1+1e-9) ? ceiling(value) : limit;
+    return {xmax:need(x,xmax), ymax:need(y,ymax)};
+  }
+  return {fit,curve,grow};
 })();
 if (typeof module!=='undefined') module.exports=MarketEquations;

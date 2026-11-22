@@ -30,3 +30,22 @@ test('fields the editor reads are type-checked',()=>{
   ];
   for(const breakIt of broken){const w=workspace();breakIt(w);assert.equal(M.validWorkspace(w),false,breakIt.toString());}
 });
+
+test('equilibrium anchors E and both guides to the crossing',()=>{
+  const g=M.blank('t',150,80);
+  const d=M.shape('line','Demand',[{x:0,y:68},{x:136,y:0}]),s=M.shape('line','Supply',[{x:0,y:23},{x:150,y:73}]);
+  g.objects.push(d,s);
+  const added=M.equilibrium(g,d.id,s.id);
+  g.objects.push(...added);
+  const {resolved}=M.resolve(g),[h,v,e]=added.map(o=>resolved.get(o.id));
+  const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,a+' vs '+b);
+  close(e.pts[0].x,54);close(e.pts[0].y,41);
+  close(h.pts[0].x,0);close(h.pts[0].y,41);close(v.pts[0].x,54);close(v.pts[0].y,0);
+  // Moving supply moves E and the guides with it.
+  s.pts=[{x:0,y:0},{x:150,y:75}];
+  const moved=M.resolve(g).resolved;
+  close(moved.get(e.id).pts[0].y,moved.get(h.id).pts[0].y);
+  close(moved.get(e.id).pts[0].x,moved.get(v.id).pts[0].x);
+  assert.ok(M.validWorkspace({version:1,graphs:[g],active:g.id}));
+  assert.equal(M.equilibrium(g,d.id,'missing'),null);
+});
