@@ -25,4 +25,4 @@ Use **Export → Copy graph for Word** or **Download PNG** to insert a figure in
 
 ## Source
 
-The editor uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **app.js** implements drawing, editing, persistence, and export. Run the regression checks with `node --test`.
+The editor uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **app.js** implements drawing, editing, persistence, and export. Run the regression checks with `node --test`. The browser smoke test drives the editor in headless Chromium: `npm install --no-save playwright` once, then `node e2e/smoke.mjs`. GitHub Actions runs both on every push and pull request.
