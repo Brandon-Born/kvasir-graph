@@ -1,5 +1,6 @@
 'use strict';
 // Wiring: sidebar controls, keeping tabs in sync, keyboard shortcuts, and startup.
+$('new').innerHTML=icon('New')+'New';$('settings').insertAdjacentHTML('afterbegin',icon('Axes'));
 $('new').onclick=newGraph;$('settings').onclick=settings;$('graph-menu').onclick=graphMenu;$('close').onclick=()=>dialog.close();
 $('grid').onchange=()=>commit(()=>graph().grid=$('grid').checked);$('snap').onchange=()=>commit(()=>graph().snap=$('snap').checked);
 $('undo').onclick=()=>historyMove(undo,redo);$('redo').onclick=()=>historyMove(redo,undo);

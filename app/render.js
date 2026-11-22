@@ -91,7 +91,16 @@ function setTool(name,keepObjectRows=false){tool=name;start=null;hover=null;drag
 function renderSelection(){
   for(const row of $('objects').querySelectorAll('button'))row.classList.toggle('active',row.dataset.id===selected);
   const o=selectedObj();
-  $('inspector').replaceChildren(...(o?objectActions(o).map(([name,act])=>btn(name,act)):[]));
+  if(!o){$('inspector').replaceChildren();return;}
+  // A card for the selected object: what it is, then its actions with shortcuts.
+  const head=document.createElement('div'),sample=document.createElement('span'),name=document.createElement('span');
+  head.className='inspector-head';sample.className='sample '+o.kind;sample.style.backgroundColor=color(o);renderLabel(name,o.name);head.append(sample,name);
+  const keys={Edit:'Enter',Delete:'Del'};
+  $('inspector').replaceChildren(head,...objectActions(o).map(([label,act])=>{
+    const b=btn('',act,'action'+(label==='Delete'?' danger':''));b.innerHTML=icon(label);b.append(label);
+    if(keys[label]){const k=document.createElement('kbd');k.textContent=keys[label];b.append(k);}
+    return b;
+  }));
 }
 function render(keepObjectRows=false){
   if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();

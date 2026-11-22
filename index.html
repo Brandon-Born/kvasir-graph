@@ -3,9 +3,9 @@
 <body>
 <header><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/></svg>Kvasir Graph</div><span id="saved">Local workspace</span><div class="head-actions"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button><button id="export" class="primary" aria-haspopup="menu" aria-expanded="false">Export ▾</button></div></header>
 <div class="layout"><aside>
-<section><h2>Graphs</h2><button id="new" class="wide outline">＋ New graph</button><div id="graphs"></div></section>
+<section><div class="section-head"><h2>Graphs</h2><button id="new" class="small outline" title="New graph" aria-label="New graph"></button></div><div id="graphs"></div></section>
 <section><h2>Graph objects</h2><div id="objects"></div><div id="inspector"></div></section>
-<section><h2>Graph options</h2><label class="switch">Grid<input id="grid" type="checkbox"></label><label class="switch">Snap to geometry<input id="snap" type="checkbox"></label><button id="settings" class="wide subtle">Axes &amp; scale</button></section>
+<section><h2>Graph options</h2><label class="switch">Grid<input id="grid" type="checkbox"></label><label class="switch">Snap to geometry<input id="snap" type="checkbox"></label><button id="settings" class="action">Axes &amp; scale</button></section>
 </aside>
 <main><div class="heading"><h1 id="title"></h1><button id="graph-menu" title="Graph actions" aria-label="Graph actions" aria-haspopup="menu" aria-expanded="false">•••</button></div>
 <div class="sheet"><div id="toolbar" role="toolbar" aria-label="Drawing tools"></div><div id="options"></div>

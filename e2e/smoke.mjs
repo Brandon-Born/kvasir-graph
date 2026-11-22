@@ -62,6 +62,16 @@ test('a new graph from equations marks the equilibrium', async () => {
   assert.equal(await page.textContent('#hint'), 'E is at Q = 54, P = 41.');
 });
 
+test('selecting an object shows its actions in the sidebar', async () => {
+  await page.locator('#objects button', {hasText: 'Supply'}).click();
+  assert.equal(await page.textContent('.inspector-head'), 'Supply');
+  const actions = await page.$$eval('#inspector button.action', rows => rows.map(row => row.textContent));
+  assert.equal(actions[0], 'EditEnter');
+  assert.equal(actions.at(-1), 'DeleteDel');
+  await page.click('#plot');
+  await page.keyboard.press('Escape');
+});
+
 test('export opens a menu and edits survive a reload', async () => {
   await page.click('#export');
   assert.equal(await page.$$eval('#object-menu [role=menuitem]', items => items.length), 5);
