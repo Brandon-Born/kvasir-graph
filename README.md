@@ -19,7 +19,7 @@ When naming a point, curve, axis, area, or free-text label, use **Size (px)** to
 
 ## Save and export
 
-The browser saves edits on this device. **Export → Save editable workspace** downloads all graphs as JSON and lets you move them between browsers or computers. **••• → Open workspace backup** adds the saved graphs to the current workspace.
+The browser saves edits on this device. Tabs stay in sync: an edit in one tab appears in any other open tab, which keeps its own graph in view. **Export → Save editable workspace** downloads all graphs as JSON and lets you move them between browsers or computers. **••• → Open workspace backup** adds the saved graphs to the current workspace.
 
 Use **Export → Copy graph for Word** or **Download PNG** to insert a figure into the assignment. SVG is available for vector graphics. **Print or save PDF** prints the active graph. Keyboard shortcuts include Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Delete or Backspace, and Escape. If saved data on this device can't be opened, the editor keeps a copy and **••• → Download unopened saved data** retrieves it.
 
