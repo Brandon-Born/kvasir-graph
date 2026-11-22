@@ -3,6 +3,8 @@ const assert=require('node:assert/strict');
 const {fit}=require('./equations.js');
 const G=require('./geometry.js');
 const market=(demand,supply='')=>fit([{name:'Demand',text:demand},{name:'Supply',text:supply}]);
+// Compare geometry only; each curve also keeps the equation text it came from.
+const shape=r=>({...r,curves:r.curves.map(({text,...c})=>c)});
 
 test('assignment curves include their intercepts and intersect at the exact market equilibrium',()=>{
   const result=market('Qd = 136 − 2P','Qs = 3P – 69');
@@ -10,8 +12,9 @@ test('assignment curves include their intercepts and intersect at the exact mark
   assert.deepEqual(result.curves[1].pts[0],{x:0,y:23});
   assert.deepEqual(G.crossings(...result.curves.map(o=>o.pts)),[{x:54,y:41}]);
   assert.ok(result.xmax>136 && result.xmax<=160 && result.ymax>68 && result.ymax<=80);
-  assert.deepEqual(market('P = 68 - Q/2','P = 23 + Q/3'),result);
-  assert.deepEqual(market('2P + Q_d = 136','Qₛ = 3(P - 23)'),result);
+  assert.deepEqual(result.curves.map(c=>c.text),['Qd = 136 − 2P','Qs = 3P – 69']);
+  assert.deepEqual(shape(market('P = 68 - Q/2','P = 23 + Q/3')),shape(result));
+  assert.deepEqual(shape(market('2P + Q_d = 136','Qₛ = 3(P - 23)')),shape(result));
 });
 
 test('ranges adapt independently to different quantities and prices',()=>{
@@ -39,4 +42,12 @@ test('invalid expressions and curves outside quadrant one give a correction',()=
     assert.throws(()=>market(input),/Demand:/);
   }
   assert.throws(()=>market('',''),/Enter a supply or demand equation/);
+});
+
+test('an edited equation is clipped to the current axes',()=>{
+  const {curve}=require('./equations.js');
+  assert.deepEqual(curve('Qd = 136 - 2P',150,80),[{x:0,y:68},{x:136,y:0}]);
+  assert.deepEqual(curve('P = 68 - Q/2',100,80),[{x:0,y:68},{x:100,y:18}]);
+  assert.throws(()=>curve('P = 200',100,80),/no visible segment/);
+  assert.throws(()=>curve('P = Q*Q',100,80),/straight-line/);
 });

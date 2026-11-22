@@ -91,7 +91,7 @@ const MarketEquations = (() => {
   }
   function fit(entries) {
     const lines = entries.filter(e=>e.text.trim()).map(({name,text})=>{
-      try {return {name,...parse(text)};}
+      try {return {name,text:text.trim(),...parse(text)};}
       catch(error) {throw Error(name+': '+error.message);}
     });
     if (!lines.length) throw Error('Enter a supply or demand equation.');
@@ -126,10 +126,17 @@ const MarketEquations = (() => {
     const curves = lines.map(line=>{
       const pts = segment(line,xmax,ymax);
       if (pts.length!==2) throw Error(line.name+': the line needs a visible segment at nonnegative price and quantity.');
-      return {name:line.name,pts};
+      return {name:line.name,text:line.text,pts};
     });
     return {xmax,ymax,curves};
   }
-  return {fit};
+  // Clip one equation to the current axes, for editing a curve's equation or
+  // refitting it after the axes change.
+  function curve(text,xmax,ymax) {
+    const pts = segment(parse(text),xmax,ymax);
+    if (pts.length!==2) throw Error('This line has no visible segment on the current axes. Widen them in Axes & scale.');
+    return pts;
+  }
+  return {fit,curve};
 })();
 if (typeof module!=='undefined') module.exports=MarketEquations;

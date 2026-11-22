@@ -165,10 +165,49 @@ function objectActions(o){
   const actions=[['Edit',()=>editObject(o)]];
   if(o.kind!=='label'&&(o.kind!=='guide'||o.showLabel))actions.push(['Move label',()=>setTool('Move label')]);
   if(['line','u','free','guide'].includes(o.kind))actions.push(['Copy & shift',()=>shiftDialog(o)]);
+  if(equilibriumPartners(o).length)actions.push(['Mark equilibrium',()=>equilibriumDialog(o)]);
   if(o.kind==='region')actions.push(['Add area',()=>{setTool('Shade');shadeGroup=o.id;$('hint').textContent='Click another area to include in '+o.name+'.';}]);
   if(o.pts.some(p=>p.ref))actions.push(['Detach',()=>commit(()=>{o.pts=scene.resolved.get(o.id).pts.map(({x,y})=>({x,y}));})]);
   actions.push(['Delete',deleteSelected]);
   return actions;
+}
+// Curves that cross o inside the plot and have no point marked there yet.
+function equilibriumPartners(o){
+  const curves=['line','u','free'];
+  if(!curves.includes(o.kind))return [];
+  getScene();const g=graph(),mine=scene.paths.get(o.id);
+  if(!mine)return [];
+  const inside=q=>q.x>=0&&q.y>=0&&q.x<=g.xmax&&q.y<=g.ymax;
+  const marked=k=>g.objects.some(pt=>pt.kind==='point'&&[pt.pts[0].ref?.a,pt.pts[0].ref?.b].sort().join()===[o.id,k.id].sort().join());
+  return g.objects.filter(k=>k.id!==o.id&&curves.includes(k.kind)&&G.crossings(mine,scene.paths.get(k.id)||[]).some(inside)&&!marked(k));
+}
+function equilibriumName(){
+  const names=new Set(graph().objects.map(o=>o.name));
+  if(!names.has('E'))return 'E';
+  let i=1;while(names.has('E_{'+i+'}'))i++;return 'E_{'+i+'}';
+}
+function equilibriumHint(point){
+  const p=scene.resolved.get(point.id)?.pts[0]??point.pts[0];
+  $('hint').textContent=point.name.replace(/_\{([^{}]+)\}/g,'$1')+' is at Q = '+num(p.x)+', P = '+num(p.y)+'.';
+}
+function markEquilibrium(a,b){
+  let point=null;
+  commit(()=>{
+    const added=M.equilibrium(graph(),a.id,b.id,equilibriumName());
+    if(!added)return;
+    graph().objects.push(...added);point=added[2];selected=point.id;
+  });
+  if(point)equilibriumHint(point);
+}
+function equilibriumDialog(o){
+  const partners=equilibriumPartners(o);
+  if(partners.length===1)return markEquilibrium(o,partners[0]);
+  modal('Mark equilibrium');
+  const label=document.createElement('label'),choice=document.createElement('select');
+  label.textContent='Where '+o.name+' crosses';
+  partners.forEach((k,i)=>choice.add(new Option(k.name,i)));
+  label.append(choice);fields.append(label);
+  submit('Mark equilibrium',()=>{markEquilibrium(o,partners[choice.value]);});
 }
 const objectMenu=$('object-menu');
 function openObjectMenu(event,id){
@@ -228,7 +267,7 @@ function render(keepObjectRows=false){
     const b=btn('',()=>{selected=o.id;setTool('Select',true);},'object');
     b.dataset.id=o.id;
     b.oncontextmenu=e=>openObjectMenu(e,o.id);
-    b.ondblclick=()=>editObject(o);
+    b.ondblclick=()=>editObject(o);if(o.equation)b.title=o.equation;
     const sample=document.createElement('span'),name=document.createElement('span');
     sample.className='sample '+o.kind;sample.style.backgroundColor=color(o);
     renderLabel(name,o.name);b.append(sample,name);return b;
@@ -456,7 +495,7 @@ plot.onpointermove=event=>{
       const initial=drag.labelOrigin||base.labelAt||labelPosition(base)||drag.raw;
       o.labelAt={x:initial.x+dx,y:initial.y+dy};
     }else if(drag.type==='handle'||['point','label'].includes(o.kind)){
-      const i=drag.idx>=0?drag.idx:0;
+      const i=drag.idx>=0?drag.idx:0;delete o.equation;
       const autoGuide=o.kind==='guide'&&(drag.original.orientation??'auto')==='auto';
       const from=autoGuide?base.pts[1-i]:null;
       const projection=autoGuide&&graph().snap&&!event.altKey?axisProjection(from,raw):null;
@@ -471,7 +510,8 @@ plot.onpointermove=event=>{
           o.pts[i]={x:i===0?Math.min(p.x,base.pts[1].x-.001):Math.max(p.x,base.pts[1].x+.001),y:Math.max(p.y,base.pts[1].y)};}
       }else o.pts[i]=p;
     }else{
-      o.pts=base.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
+      // A hand-moved curve no longer matches its equation.
+      delete o.equation;o.pts=base.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
       if(base.labelAt)o.labelAt={x:base.labelAt.x+dx,y:base.labelAt.y+dy};
     }
     cache=null;renderPlot();return;
@@ -571,20 +611,32 @@ function editObject(o){
   const size=objectFontSize(o);
   const n=o.caption===undefined?labelField('Name',o.name,size):field('Name',o.name);
   const label=o.caption!==undefined?labelField('Label on graph',o.caption,size):null,c=field('Color',color(o),'color');
+  let equation=null;
+  if(o.kind==='line'){
+    equation=field('Equation (optional)',o.equation??'');equation.required=false;equation.placeholder='P = 68 − Q/2';
+    equation.title='Enter a straight-line equation in Q and P to redraw this curve exactly.';
+  }
   let show=null;if(o.kind==='guide'){show=field('Show label on graph','','checkbox');show.required=false;show.checked=!!o.showLabel;}
   const base=scene.resolved.get(o.id).pts,points=base.length<=3?base.map((p,i)=>pointFields(o.kind==='u'?['Left arm','Minimum','Right arm'][i]:base.length===1?'Position':'Endpoint '+(i+1),p)):[];
   submit('Apply',()=>{
     const updated=points.map(fn=>fn());
     if(o.kind==='u'&&!(updated[0].x<updated[1].x&&updated[1].x<updated[2].x&&updated[1].y<=Math.min(updated[0].y,updated[2].y))){notice('Keep the minimum between and below both arms.');return false;}
     if(['line','guide'].includes(o.kind)&&distance(updated[0],updated[1])<.001){notice('Choose two different endpoints.');return false;}
+    // A new equation redraws the line; otherwise edited endpoints win and the equation is dropped.
+    const text=equation?.value.trim()??'',fromEquation=text&&text!==(o.equation??'');
+    let fitted=null;
+    if(fromEquation){try{fitted=MarketEquations.curve(text,graph().xmax,graph().ymax);}catch(error){notice(error.message);return false;}}
     commit(()=>{o.name=n.value;o.color=c.value;o.fontSize=(label??n).fontSize;if(label)o.caption=label.value;if(show)o.showLabel=show.checked;
-      updated.forEach((p,i)=>{if(num(base[i].x)!==num(p.x)||num(base[i].y)!==num(p.y))o.pts[i]=p;});});
+      if(fitted){o.pts=fitted;o.equation=text;return;}
+      let moved=false;
+      updated.forEach((p,i)=>{if(num(base[i].x)!==num(p.x)||num(base[i].y)!==num(p.y)){o.pts[i]=p;moved=true;}});
+      if(moved||!text)delete o.equation;});
   });
 }
 function shiftDialog(o){
   modal('Copy and shift');const n=labelField('New curve label',o.name+'′',objectFontSize(o)),dx=field('Quantity shift (ΔQ)',0,'number'),dy=field('Price shift (ΔP)',5,'number');
   submit('Add shifted copy',()=>{
-    const copy=clone(o);copy.id=M.id();copy.name=n.value;copy.fontSize=n.fontSize;delete copy.caption;delete copy.labelAt;
+    const copy=clone(o);copy.id=M.id();copy.name=n.value;copy.fontSize=n.fontSize;delete copy.caption;delete copy.labelAt;delete copy.equation;
     copy.pts=scene.resolved.get(o.id).pts.map(p=>({x:p.x+dx.valueAsNumber,y:p.y+dy.valueAsNumber}));copy.color=newColor();addShape(copy);
   });
 }
@@ -623,6 +675,7 @@ function newGraph(){
   supply.required=demand.required=false;
   const help=document.createElement('p'),preview=document.createElement('output');
   help.textContent='Enter one or both linear equations in Q or P. The axes scale automatically.';
+  const markE=field('Mark equilibrium (E with dashed guides)','','checkbox',equations);markE.required=false;markE.checked=true;
   equations.prepend(help);equations.append(preview);preview.className='range-preview';
   preview.setAttribute('aria-live','polite');
   const fit=()=>MarketEquations.fit([{name:'Demand',text:demand.value},{name:'Supply',text:supply.value}]);
@@ -649,18 +702,23 @@ function newGraph(){
     const automatic=mode.value==='equations',result=automatic?updatePreview(true):null;
     if(automatic&&!result)return false;
     const g=M.blank(title.value,result?.xmax??x.valueAsNumber,result?.ymax??y.valueAsNumber);
-    for(const curve of result?.curves??[]){
+    const lines=(result?.curves??[]).map(curve=>{
       const o=M.shape('line',curve.name,curve.pts,curve.name==='Demand'?M.teal:M.orange);
-      o.caption=curve.name[0];g.objects.push(o);
-    }
+      o.caption=curve.name[0];o.equation=curve.text;g.objects.push(o);return o;
+    });
+    const added=automatic&&markE.checked&&lines.length===2?M.equilibrium(g,lines[0].id,lines[1].id):null;
+    if(added)g.objects.push(...added);
     commit(()=>{state.graphs.push(g);state.active=g.id;resetTools();});
+    if(added)equilibriumHint(added[2]);
   });
 }
 function settings(){
   const g=graph();modal('Axes and scale');
   const x=labelField('Horizontal axis label',g.xlabel,fontSize(g.xFontSize,19)),y=labelField('Vertical axis label',g.ylabel,fontSize(g.yFontSize,19));
   const xm=field('Maximum quantity',g.xmax,'number'),ym=field('Maximum price',g.ymax,'number');
-  xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xFontSize=x.fontSize;g.yFontSize=y.fontSize;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;}));
+  xm.min=ym.min='.00001';submit('Apply',()=>commit(()=>{g.xlabel=x.value;g.ylabel=y.value;g.xFontSize=x.fontSize;g.yFontSize=y.fontSize;g.xmax=xm.valueAsNumber;g.ymax=ym.valueAsNumber;
+    // Lines entered as equations are redrawn to span the new axes.
+    for(const o of g.objects)if(o.kind==='line'&&o.equation){try{o.pts=MarketEquations.curve(o.equation,g.xmax,g.ymax);}catch{}}}));
 }
 function graphMenu(){
   const backup=unreadableBackup();

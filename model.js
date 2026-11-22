@@ -66,10 +66,7 @@ const Model = (() => {
     const d=shape('line','Demand',[{x:0,y:10},{x:100,y:0}]),s=shape('line','Supply',[{x:0,y:0},{x:100,y:10}],orange);
     d.caption='D';s.caption='S';
     const e={x:50,y:5,ref:{a:d.id,b:s.id}};
-    const h=shape('guide','Price guide',[{x:0,y:5},e],ink),v=shape('guide','Quantity guide',[{x:50,y:0},e],ink);
-    h.orientation='h';v.orientation='v';h.sourceEnd=v.sourceEnd=1;
-    h.pts[0].ref={a:'@price',t:.5};v.pts[0].ref={a:'@quantity',t:.5};
-    g.objects.push(d,s,h,v,shape('point','E',[e],ink));
+    g.objects.push(d,s);g.objects.push(...equilibrium(g,d.id,s.id));
     const faces=regions(g,resolve(g));
     for(const [name,y,color] of [['Consumer surplus',6.6,teal],['Producer surplus',3.3,orange]]){
       const seed={x:16,y},face=faces.find(f=>G.inside(seed,f.poly));
@@ -79,6 +76,19 @@ const Model = (() => {
   }
   // Check every field the editor reads, so a damaged or hand-edited backup is
   // rejected up front instead of breaking rendering after it has been saved.
+  // Point E where curves a and b cross, anchored to both, with dashed guides to
+  // each axis that follow it when either curve moves. Null if they don't cross.
+  function equilibrium(graph,a,b,name='E'){
+    const {paths}=resolve(graph),first=paths.get(a),second=paths.get(b);
+    if(!first||!second)return null;
+    const p=G.crossings(first,second).find(q=>q.x>=0&&q.y>=0&&q.x<=graph.xmax&&q.y<=graph.ymax);
+    if(!p)return null;
+    const e={x:p.x,y:p.y,ref:{a,b}},suffix=name==='E'?'':' '+name;
+    const h=shape('guide','Price guide'+suffix,[{x:0,y:p.y,ref:{a:'@price',t:1-p.y/graph.ymax}},{...e}],ink);
+    const v=shape('guide','Quantity guide'+suffix,[{x:p.x,y:0,ref:{a:'@quantity',t:p.x/graph.xmax}},{...e}],ink);
+    h.orientation='h';v.orientation='v';h.sourceEnd=v.sourceEnd=1;
+    return [h,v,shape('point',name,[{...e}],ink)];
+  }
   function validWorkspace(w){
     const kinds=['line','guide','free','u','point','label','region'];
     const str=v=>typeof v==='string', num=Number.isFinite;
@@ -90,7 +100,7 @@ const Model = (() => {
       o.kind==='region'||o.pts.length>=2;
     const object=o=>o!==null&&typeof o==='object'&&str(o.id)&&str(o.name)&&kinds.includes(o.kind)&&
       Array.isArray(o.pts)&&o.pts.every(point)&&count(o)&&
-      optional(o.caption,str)&&optional(o.color,str)&&optional(o.orientation,str)&&
+      optional(o.caption,str)&&optional(o.equation,str)&&optional(o.color,str)&&optional(o.orientation,str)&&
       optional(o.fontSize,num)&&optional(o.sourceEnd,num)&&optional(o.labelAt,finite)&&
       (o.kind!=='region'||Array.isArray(o.pieces)&&o.pieces.every(p=>p!==null&&typeof p==='object'&&finite(p.seed)&&str(p.signature)));
     const graph=g=>g!==null&&typeof g==='object'&&str(g.id)&&str(g.name)&&num(g.xmax)&&g.xmax>0&&num(g.ymax)&&g.ymax>0&&
@@ -98,6 +108,6 @@ const Model = (() => {
       Array.isArray(g.objects)&&g.objects.every(object);
     return w?.version===1&&Array.isArray(w.graphs)&&w.graphs.length>0&&w.graphs.some(g=>g?.id===w.active)&&w.graphs.every(graph);
   }
-  return {id,shape,blank,resolve,regions,findFace,piece,demo,validWorkspace,teal,orange,ink};
+  return {id,shape,blank,resolve,regions,findFace,piece,demo,equilibrium,validWorkspace,teal,orange,ink};
 })();
 if(typeof module!=='undefined') module.exports=Model;
