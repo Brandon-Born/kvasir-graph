@@ -803,6 +803,25 @@ $('import').onchange=async event=>{
 $('new').onclick=newGraph;$('settings').onclick=settings;$('graph-menu').onclick=graphMenu;$('close').onclick=()=>dialog.close();
 $('grid').onchange=()=>commit(()=>graph().grid=$('grid').checked);$('snap').onchange=()=>commit(()=>graph().snap=$('snap').checked);
 $('undo').onclick=()=>historyMove(undo,redo);$('redo').onclick=()=>historyMove(redo,undo);
+// Another tab saved the workspace. Adopt its version so this tab never writes
+// over newer work, keeping this tab's own graph in view.
+addEventListener('storage',event=>{
+  if(event.key!==key||event.newValue===null||event.newValue===JSON.stringify(state))return;
+  let incoming;
+  try{incoming=JSON.parse(event.newValue);}catch{return;}
+  if(!M.validWorkspace(incoming))return;
+  const active=state.active,interrupted=dialog.open||!!drag||!!start;
+  if(dialog.open)dialog.close();
+  if(objectMenu.matches(':popover-open'))objectMenu.hidePopover();
+  cancelScheduledRender();
+  if(incoming.graphs.some(g=>g.id===active))incoming.active=active;
+  state=incoming;
+  // Undoing here would roll back the other tab's work, so history starts over.
+  undo.length=redo.length=0;
+  resetTools();cache=null;render();
+  $('saved').textContent='✓  Updated from another tab';
+  $('hint').textContent=interrupted?'This workspace changed in another tab, so your unfinished edit here was cancelled.':'This workspace changed in another tab. You are seeing the latest version.';
+});
 document.addEventListener('keydown',e=>{
   if(dialog.open||e.target.matches('input,select,textarea'))return;
   if(e.key==='Escape'){cancelScheduledRender();if(drag?.snapshot){state=JSON.parse(drag.snapshot);cache=null;}setTool('Select');return;}
