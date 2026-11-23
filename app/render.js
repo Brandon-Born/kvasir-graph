@@ -27,7 +27,8 @@ function renderPlot(){
       const x=isX?X(n):box.x,y=isX?Y(0):Y(n);
       if(g.grid)svg('line',{x1:x,y1:y,x2:isX?x:X(g.xmax),y2:isX?box.y:y,stroke:'#dbe5e6'},grid);
       svg('line',{x1:x,y1:y,x2:isX?x:x-5,y2:isX?y+5:y,stroke:M.ink},grid);
-      if(isX||n)txt(grid,num(n),isX?x:x-10,isX?y+23:y+5,{'text-anchor':isX?'middle':'end','font-family':'Segoe UI, sans-serif','font-size':14});
+      const tickLabel=isX?num(n):'$'+Number(n.toPrecision(12));
+      txt(grid,tickLabel,isX?x:x-10,isX?y+23:y+5,{'text-anchor':isX?'middle':'end','font-family':'Segoe UI, sans-serif','font-size':14});
     }
   }
   for(const o of scene.resolved.values()){
