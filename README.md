@@ -1,12 +1,12 @@
-# Kvasir Graph
+# Kvasir
 
-Open **index.html** in Edge, Chrome, or Firefox. The editor runs locally with no installation, server, or internet connection.
+A local-first suite of MBA homework and exam-prep tools. Open **index.html** in Edge, Chrome, or Firefox to browse the suite, or jump straight into **graph.html** for **Kvasir Graph** (built for Microeconomics for Business). Everything runs locally with no installation, server, or internet connection.
 
-Kvasir Graph uses the [PolyForm Noncommercial License 1.0.0](LICENSE). It permits using, modifying, and sharing the editor for noncommercial purposes.
+Kvasir uses the [PolyForm Noncommercial License 1.0.0](LICENSE). It permits using, modifying, and sharing the suite for noncommercial purposes.
 
 Required Notice: Copyright 2026 Brandon Born
 
-## Make a graph
+## Kvasir Graph (`graph.html`)
 
 1. Choose **New graph → Start with → Supply and demand equations** to plot one or both linear equations. Enter quantity form (such as `Qd = 136 - 2P` and `Qs = 3P - 69`) or inverse form (such as `P = 23 + Q/3`). Check the axis preview, then choose **Create graph**. **Mark equilibrium** (on by default) adds point E with dashed guides to both axes and shows its exact Q and P. Each curve keeps its equation: double-click it to change the equation (the axes expand automatically if the new line runs off the graph), and **Axes & scale** redraws equation curves to span the new axes. For manual drawing, choose **Blank graph** and set the axis limits yourself. **Axes & scale** changes either axis later.
 2. Choose **Draw → Straight line** and click two points. For exact intercepts, use **Enter coordinates**. Use **Draw → U-shaped** to place a minimum, then drag either arm. **Freehand** smooths a mouse or pen stroke.
@@ -25,7 +25,7 @@ Use **Export → Copy graph for Word** or **Download PNG** to insert a figure in
 
 ## Source
 
-The editor uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **equations.js** parses supply and demand equations and fits the axes. The editor itself lives in **app/**, loaded in this order as plain scripts that share one global scope (so the page still opens straight from disk):
+**index.html**, **home.css**, and **home.js** power the Kvasir landing page and tool directory. **graph.html** and **style.css** host the Kvasir Graph editor, which uses native SVG and browser pointer events. **geometry.js** splits curves and guides at intersections and builds closed faces. **model.js** resolves snapped anchors and stores graph objects. **equations.js** parses supply and demand equations and fits the axes. The editor itself lives in **app/**, loaded in this order as plain scripts that share one global scope (so every page still opens straight from disk):
 
 - **ui.js**: DOM and SVG helpers, and labels with subscripts
 - **store.js**: loading, backups, editor state, scale, saving, undo, and the cached scene

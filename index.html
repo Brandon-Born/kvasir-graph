@@ -1,17 +1,354 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kvasir Graph · Economics graph editor</title><link rel="stylesheet" href="style.css"></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kvasir · MBA Study Tools</title>
+  <meta name="description" content="A local-first suite of MBA homework and exam-prep tools, starting with Kvasir Graph for Microeconomics for Business.">
+  <link rel="stylesheet" href="home.css">
+</head>
 <body>
-<header><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/></svg>Kvasir Graph</div><span id="saved">Local workspace</span><div class="head-actions"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button><button id="export" class="primary" aria-haspopup="menu" aria-expanded="false">Export ▾</button></div></header>
-<div class="layout"><aside>
-<section><div class="section-head"><h2>Graphs</h2><button id="new" class="small outline" title="New graph" aria-label="New graph"></button></div><div id="graphs"></div></section>
-<section><h2>Graph objects</h2><div id="objects"></div><div id="inspector"></div></section>
-<section><h2>Graph options</h2><label class="switch">Grid<input id="grid" type="checkbox"></label><label class="switch">Snap to geometry<input id="snap" type="checkbox"></label><button id="settings" class="action">Axes &amp; scale</button></section>
-</aside>
-<main><div class="heading"><h1 id="title"></h1><button id="graph-menu" title="Graph actions" aria-label="Graph actions" aria-haspopup="menu" aria-expanded="false">•••</button></div>
-<div class="sheet"><div id="toolbar" role="toolbar" aria-label="Drawing tools"></div><div id="options"></div>
-<div class="status"><span id="hint" role="status"></span><span id="coords">Q — &nbsp; P —</span></div>
-<svg id="plot" viewBox="0 0 900 535" aria-label="Editable price and quantity diagram" tabindex="0" xmlns="http://www.w3.org/2000/svg"></svg></div>
-</main></div>
-<div id="object-menu" role="menu" aria-label="Object actions" popover="auto"></div>
-<dialog id="dialog"><form id="form"><div class="dialog-title"><h2 id="dialog-title"></h2><button type="button" id="close" aria-label="Close">×</button></div><div id="fields"></div><div id="form-actions"></div></form></dialog>
-<input type="file" id="import" accept=".json" hidden><script src="geometry.js"></script><script src="model.js"></script><script src="equations.js"></script><script src="app/ui.js"></script><script src="app/store.js"></script><script src="app/render.js"></script><script src="app/menus.js"></script><script src="app/pointer.js"></script><script src="app/dialogs.js"></script><script src="app/export.js"></script><script src="app/main.js"></script></body></html>
+  <a href="#main-content" class="skip-link visually-hidden">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+          <path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/>
+        </svg>
+        <span>Kvasir</span>
+        <span class="brand-tag">MBA Toolkit</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <button
+          class="menu-button"
+          type="button"
+          popovertarget="site-menu"
+          popovertargetaction="toggle"
+          aria-controls="site-menu"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M3 5h14M3 10h14M3 15h14"/>
+          </svg>
+          <span>Menu</span>
+        </button>
+
+        <ul id="site-menu" class="site-menu" popover="auto">
+          <li><a href="index.html" aria-current="page">Overview</a></li>
+          <li><a href="#tools">Tools</a></li>
+          <li><a href="#courses">Courses</a></li>
+          <li><a href="#workflow">How it works</a></li>
+          <li><a class="nav-cta" href="graph.html">Open Kvasir Graph</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <hgroup>
+          <h1 id="main-content" tabindex="-1">Study tools for MBA coursework.</h1>
+          <p class="hero-subtitle">
+            <span class="pill"><span class="status-dot" aria-hidden="true"></span>Now live · Kvasir Graph</span>
+            <span>Microeconomics for Business</span>
+          </p>
+        </hgroup>
+
+        <p class="hero-lead">
+          Kvasir is a growing suite of fast, browser-based utilities for MBA homework, problem sets, and exam prep. Plot economics diagrams from equations, export crisp figures straight to Word, and keep everything saved locally with no accounts or installs.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="graph.html">Open Kvasir Graph</a>
+          <a class="btn outline" href="#tools">Browse the toolkit</a>
+        </div>
+
+        <dl class="hero-meta">
+          <div>
+            <dt>First focus</dt>
+            <dd>Microeconomics</dd>
+          </div>
+          <div>
+            <dt>Live tools</dt>
+            <dd>1 live · 3 planned</dd>
+          </div>
+          <div>
+            <dt>Workspace</dt>
+            <dd>100% local</dd>
+          </div>
+        </dl>
+      </div>
+
+      <figure class="preview-sheet">
+        <div class="preview-bar">
+          <strong>Kvasir Graph · Market equilibrium</strong>
+          <span class="preview-coords">E (54, $41)</span>
+        </div>
+        <svg class="preview-svg" viewBox="0 0 480 310" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Sample supply and demand equilibrium graph for Qd = 136 - 2P and Qs = 3P - 69, showing Demand, Supply, Consumer Surplus, Producer Surplus, and equilibrium point E at Q = 54 and P = $41.</title>
+          <rect width="480" height="310" fill="#ffffff"/>
+          <!-- Gridlines -->
+          <g stroke="#dbe5e6" stroke-width="1">
+            <line x1="68" y1="76" x2="432" y2="76"/>
+            <line x1="68" y1="136" x2="432" y2="136"/>
+            <line x1="68" y1="196" x2="432" y2="196"/>
+            <line x1="120" y1="34" x2="120" y2="256"/>
+            <line x1="172" y1="34" x2="172" y2="256"/>
+            <line x1="224" y1="34" x2="224" y2="256"/>
+            <line x1="276" y1="34" x2="276" y2="256"/>
+            <line x1="328" y1="34" x2="328" y2="256"/>
+            <line x1="380" y1="34" x2="380" y2="256"/>
+          </g>
+          <!-- Shaded Surplus Regions (exact Kvasir Graph 0.19 fill opacity) -->
+          <polygon points="68,52 208.4,133 68,133" fill="#187d73" fill-opacity="0.19"/>
+          <polygon points="68,133 208.4,133 68,187" fill="#c35b21" fill-opacity="0.19"/>
+          <!-- Dashed Equilibrium Guides -->
+          <g stroke="#233b47" stroke-width="1.5" stroke-dasharray="6 5" fill="none">
+            <line x1="68" y1="133" x2="208.4" y2="133"/>
+            <line x1="208.4" y1="133" x2="208.4" y2="256"/>
+          </g>
+          <!-- Demand (Qd = 136 - 2P) & Supply (Qs = 3P - 69) -->
+          <line x1="68" y1="52" x2="421.6" y2="256" stroke="#187d73" stroke-width="3" stroke-linecap="round"/>
+          <line x1="68" y1="187" x2="419" y2="52" stroke="#c35b21" stroke-width="3" stroke-linecap="round"/>
+          <!-- Axes -->
+          <path d="M68 28V256H444" fill="none" stroke="#233b47" stroke-width="1.8"/>
+          <path d="m68 24-4 9h8z M448 256l-9-4v8z" fill="#233b47"/>
+          <!-- Ticks & Axis Values -->
+          <g stroke="#233b47" stroke-width="1.2">
+            <line x1="63" y1="52" x2="68" y2="52"/>
+            <line x1="63" y1="133" x2="68" y2="133"/>
+            <line x1="63" y1="187" x2="68" y2="187"/>
+            <line x1="208.4" y1="256" x2="208.4" y2="261"/>
+            <line x1="421.6" y1="256" x2="421.6" y2="261"/>
+          </g>
+          <g font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#233b47">
+            <text x="58" y="56" text-anchor="end">$68</text>
+            <text x="58" y="137" text-anchor="end" font-weight="600">$41</text>
+            <text x="58" y="191" text-anchor="end">$23</text>
+            <text x="58" y="259" text-anchor="end">$0</text>
+            <text x="208.4" y="275" text-anchor="middle" font-weight="600">54</text>
+            <text x="421.6" y="275" text-anchor="middle">136</text>
+          </g>
+          <!-- Equilibrium Point -->
+          <circle cx="208.4" cy="133" r="5.5" fill="#233b47" stroke="#ffffff" stroke-width="2"/>
+          <!-- Curve, Region & Axis Labels -->
+          <g font-family="Georgia, serif" font-style="italic">
+            <text x="64" y="19" font-size="15" fill="#233b47">Price (P)</text>
+            <text x="448" y="295" text-anchor="end" font-size="15" fill="#233b47">Quantity (Q)</text>
+            <text x="404" y="236" font-size="16" font-weight="600" fill="#187d73">D</text>
+            <text x="424" y="58" font-size="16" font-weight="600" fill="#c35b21">S</text>
+            <text x="218" y="123" font-size="16" fill="#233b47">E</text>
+            <text x="112" y="114" text-anchor="middle" font-size="13.5" fill="#182e33">CS</text>
+            <text x="112" y="156" text-anchor="middle" font-size="13.5" fill="#182e33">PS</text>
+          </g>
+        </svg>
+        <figcaption>
+          Plot linear equations like <code>Qd = 136 - 2P</code> and <code>Qs = 3P - 69</code>, shade bounded regions, and copy publication-clean figures into Word or PDF.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section id="tools">
+      <div class="section-head">
+        <h2>Tools</h2>
+        <p>Every tool is built alongside real coursework, runs locally in your browser, and exports cleanly for assignments.</p>
+      </div>
+
+      <div class="tools-stack">
+        <article class="card tool-featured">
+          <header>
+            <div class="tool-badges">
+              <span class="pill"><span class="status-dot" aria-hidden="true"></span>Live</span>
+              <span class="pill pill-muted">Microeconomics for Business</span>
+            </div>
+            <h3><a class="card-link" href="graph.html">Kvasir Graph</a></h3>
+          </header>
+
+          <div class="tool-featured-body">
+            <p>
+              An interactive SVG economics diagram editor built for problem sets and exam review. Start from supply and demand equations or a blank grid, anchor U-shaped cost curves to marginal cost, mark exact equilibrium crossings with axis guides, and shade consumer surplus, producer surplus, or deadweight loss with a single click.
+            </p>
+            <ul class="feature-tags" role="list">
+              <li>Equation plotting (Q or P form)</li>
+              <li>Auto equilibrium &amp; axis guides</li>
+              <li>U-shaped cost curves (ATC / MC)</li>
+              <li>Click-to-shade bounded areas</li>
+              <li>Copy &amp; shift curves</li>
+              <li>Word clipboard, PNG, SVG &amp; PDF</li>
+            </ul>
+          </div>
+
+          <footer>
+            <span class="card-cta-label" aria-hidden="true">Open Kvasir Graph →</span>
+            <span id="graph-workspace-meta" class="workspace-meta">Runs locally · Auto-saves in browser</span>
+          </footer>
+        </article>
+
+        <div class="tools-grid">
+          <article class="card tool-planned">
+            <header>
+              <div class="tool-badges">
+                <span class="pill pill-muted"><span class="status-dot planned" aria-hidden="true"></span>Planned</span>
+                <span class="pill pill-muted">Microeconomics</span>
+              </div>
+              <h3>Elasticity &amp; Welfare Lab</h3>
+            </header>
+            <p>
+              Calculate point and midpoint elasticities, tax incidence splits, consumer and producer surplus totals, and deadweight loss tables to pair directly with Kvasir Graph figures.
+            </p>
+            <footer>In design · Microeconomics companion</footer>
+          </article>
+
+          <article class="card tool-planned">
+            <header>
+              <div class="tool-badges">
+                <span class="pill pill-muted"><span class="status-dot planned" aria-hidden="true"></span>Planned</span>
+                <span class="pill pill-muted">Corporate Finance</span>
+              </div>
+              <h3>TVM &amp; DCF Workbench</h3>
+            </header>
+            <p>
+              Build visual cash-flow timelines, compute NPV, IRR, and bond yields, and generate clean sensitivity tables ready to paste into case memos and homework submissions.
+            </p>
+            <footer>Upcoming MBA module</footer>
+          </article>
+
+          <article class="card tool-planned">
+            <header>
+              <div class="tool-badges">
+                <span class="pill pill-muted"><span class="status-dot planned" aria-hidden="true"></span>Planned</span>
+                <span class="pill pill-muted">Accounting</span>
+              </div>
+              <h3>Ratio &amp; Statement Sandbox</h3>
+            </header>
+            <p>
+              Compare common-size income statements and balance sheets, step through DuPont ROE breakdowns, and test working-capital scenarios while prepping for exams.
+            </p>
+            <footer>Upcoming MBA module</footer>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="courses">
+      <div class="section-head">
+        <h2>Courses</h2>
+        <p>Organized by MBA subject so each class gets focused tools as terms move.</p>
+      </div>
+
+      <div class="course-grid">
+        <article class="card course-card">
+          <header>
+            <span class="course-code">Active · First module</span>
+            <h3>Microeconomics for Business</h3>
+          </header>
+          <div class="course-card-body">
+            <p>
+              Visualizing market shifts, price controls, taxes, and firm cost structures quickly makes homework and exam prep far clearer than sketching in slides.
+            </p>
+            <ul class="topic-list" role="list">
+              <li>Supply &amp; demand shifts</li>
+              <li>Equilibrium &amp; surplus</li>
+              <li>Taxes &amp; deadweight loss</li>
+              <li>ATC, AVC &amp; MC curves</li>
+              <li>Monopoly &amp; pricing</li>
+            </ul>
+          </div>
+          <footer>
+            <span>1 tool live</span>
+            <a class="text-link" href="graph.html">Open Kvasir Graph</a>
+          </footer>
+        </article>
+
+        <article class="card course-card">
+          <header>
+            <span class="course-code">Next up · MBA track</span>
+            <h3>Upcoming Coursework Modules</h3>
+          </header>
+          <div class="course-card-body">
+            <p>
+              As new courses start across finance, accounting, and business analytics, each new utility will join this same workspace with the same local-first design and export standards.
+            </p>
+            <ul class="topic-list" role="list">
+              <li>Corporate finance</li>
+              <li>Financial accounting</li>
+              <li>Managerial economics</li>
+              <li>Quantitative analytics</li>
+            </ul>
+          </div>
+          <footer>
+            <span>3 tools planned</span>
+            <span>Expanding each term</span>
+          </footer>
+        </article>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="section-head">
+        <h2>Built for real assignments</h2>
+        <p>Simple, dependable browser tools with no login walls or messy screenshots.</p>
+      </div>
+
+      <div class="principles-grid">
+        <article class="card principle-card">
+          <div class="principle-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 16h14M5 12l4-5 3 3 4-6"/>
+            </svg>
+          </div>
+          <h3>Precision from equations</h3>
+          <p>
+            Enter exact equations or coordinates instead of eyeballing lines in a slide deck. Intersections, dashed axis guides, and shaded regions stay mathematically anchored as you edit.
+          </p>
+        </article>
+
+        <article class="card principle-card">
+          <div class="principle-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 3h6l4 4v10H6zM12 3v4h4M9 11h4M9 14h4"/>
+            </svg>
+          </div>
+          <h3>Ready for Word &amp; PDF</h3>
+          <p>
+            Copy crisp diagrams directly to the clipboard for Word or Google Docs, export vector SVG or high-DPI PNG, or print cleanly to PDF without cropping screenshots.
+          </p>
+        </article>
+
+        <article class="card principle-card">
+          <div class="principle-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 5h12v10H4zM7 15v2h6v-2M8 9.5l1.5 1.5L13 7.5"/>
+            </svg>
+          </div>
+          <h3>Local-first &amp; offline</h3>
+          <p>
+            Every tool runs directly in your browser with no backend, no account, and no internet required. Work saves automatically on your device, syncs across open tabs, and exports to JSON backups.
+          </p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+          <path fill="#0c746d" d="M3 28V19h5v9zm9 0V12h5v16zm9 0V4h5v24z"/>
+        </svg>
+        <span>Kvasir · MBA Study Tools</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="graph.html">Kvasir Graph</a></li>
+        <li><a href="LICENSE">PolyForm Noncommercial 1.0.0</a></li>
+        <li><a href="https://github.com/Brandon-Born/kvasir-graph">GitHub</a></li>
+      </ul>
+      <span>© 2026 Brandon Born</span>
+    </div>
+  </footer>
+
+  <script src="home.js"></script>
+</body>
+</html>

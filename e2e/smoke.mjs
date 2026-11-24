@@ -1,11 +1,13 @@
-// Browser smoke test: drives index.html in headless Chromium through the main
-// flows. Run with `node e2e/smoke.mjs` (needs the playwright package).
+// Browser smoke test: drives index.html (Kvasir landing page) and graph.html
+// (Kvasir Graph editor) in headless Chromium. Run with `node e2e/smoke.mjs`
+// (needs the playwright package).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 
-const page_url = pathToFileURL(fileURLToPath(new URL('../index.html', import.meta.url))).href;
+const home_url = pathToFileURL(fileURLToPath(new URL('../index.html', import.meta.url))).href;
+const page_url = pathToFileURL(fileURLToPath(new URL('../graph.html', import.meta.url))).href;
 let browser, page, errors;
 
 test.before(async () => { browser = await chromium.launch(); });
@@ -27,6 +29,24 @@ const at = (x, y) => page.evaluate(([x, y]) => {
   const p = new DOMPoint(X(x), Y(y)).matrixTransform(plot.getScreenCTM());
   return [p.x, p.y];
 }, [x, y]);
+
+test('the landing page loads, adapts its nav, and links to Kvasir Graph', async () => {
+  await page.goto(home_url);
+  assert.match(await page.textContent('h1'), /MBA coursework/);
+  assert.equal(await page.locator('.site-header.is-wide').count(), 1);
+  // Narrow viewport collapses navigation to the native popover menu.
+  await page.setViewportSize({width: 420, height: 800});
+  await page.waitForFunction(() => !document.querySelector('.site-header').classList.contains('is-wide'));
+  await page.click('.menu-button');
+  await page.waitForFunction(() => document.getElementById('site-menu').matches(':popover-open'));
+  await page.setViewportSize({width: 1366, height: 800});
+  await page.waitForFunction(() => document.querySelector('.site-header').classList.contains('is-wide'));
+  await page.locator('a.card-link', {hasText: 'Kvasir Graph'}).click();
+  await page.waitForSelector('#plot');
+  assert.ok((await objects()).includes('Demand'));
+  await page.click('.brand-home');
+  await page.waitForSelector('#tools');
+});
 
 test('the demo graph loads with its objects', async () => {
   assert.deepEqual(await objects(), ['Demand', 'Supply', 'Price guide', 'Quantity guide', 'E', 'Consumer surplus', 'Producer surplus']);

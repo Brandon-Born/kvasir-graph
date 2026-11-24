@@ -25,3 +25,8 @@ button.action kbd{margin-left:auto;font:12px 'Segoe UI',Arial,sans-serif;color:v
 #inspector button.danger{color:#a3322a;margin-top:4px;border-top:1px solid var(--line);border-radius:0 0 6px 6px}#inspector button.danger svg{color:#a3322a}#inspector button.danger:hover{background:#fbeceb}
 #settings{margin-top:4px}
 @media(max-width:630px){aside{grid-template-columns:1fr}aside section+section{border-top:1px solid var(--line);padding-top:16px}}
+.brand-home{display:inline-flex;align-items:center;gap:9px;color:inherit;text-decoration:none;border-radius:6px;padding:2px 4px 2px 0}
+.brand-home:hover{color:var(--teal)}
+.brand-home:focus-visible{outline:3px solid #248caa;outline-offset:2px}
+.brand-sep{color:var(--line);font-weight:400;margin-inline:-2px}
+.brand-tool{color:var(--teal);font-weight:600}
