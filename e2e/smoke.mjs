@@ -30,10 +30,16 @@ const at = (x, y) => page.evaluate(([x, y]) => {
   return [p.x, p.y];
 }, [x, y]);
 
-test('the landing page loads, adapts its nav, and links to Kvasir Graph', async () => {
+test('the landing page loads, adapts its nav, switches figures, and links to Kvasir Graph', async () => {
   await page.goto(home_url);
   assert.match(await page.textContent('h1'), /MBA coursework/);
   assert.equal(await page.locator('.site-header.is-wide').count(), 1);
+  // Sample figure tabs switch diagrams cleanly.
+  await page.click('#tab-tax');
+  assert.equal(await page.getAttribute('#tab-tax', 'aria-selected'), 'true');
+  assert.equal(await page.locator('[aria-labelledby="tab-tax"]').getAttribute('hidden'), null);
+  await page.click('#tab-costs');
+  assert.equal(await page.getAttribute('#tab-costs', 'aria-selected'), 'true');
   // Narrow viewport collapses navigation to the native popover menu.
   await page.setViewportSize({width: 420, height: 800});
   await page.waitForFunction(() => !document.querySelector('.site-header').classList.contains('is-wide'));

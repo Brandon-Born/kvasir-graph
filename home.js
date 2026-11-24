@@ -40,7 +40,6 @@
     const width = header.getBoundingClientRect().width;
     const wasWide = header.classList.contains('is-wide');
 
-    // While collapsed, only remeasure if the header grew to avoid layout thrashing.
     if (!wasWide && lastHeaderWidth > 0 && width <= lastHeaderWidth) {
       lastHeaderWidth = width;
       return;
@@ -68,7 +67,6 @@
     requestAnimationFrame(() => header.classList.remove('is-measuring'));
   }
 
-  // Fallback toggle for browsers without native Popover API (no external CDN needed offline)
   if (!nativePopover && menu && menuButton) {
     menuButton.setAttribute('aria-expanded', 'false');
     menuButton.addEventListener('click', () => {
@@ -89,7 +87,6 @@
     });
   }
 
-  // Close the collapsed popover after picking an in-page section link
   if (menu) {
     menu.addEventListener('click', (event) => {
       const link = event.target.closest('a[href^="#"]');
@@ -104,8 +101,8 @@
   }
   syncNavLayout();
 
-  // Scrollspy: use native CSS scroll-target-group (:target-current) with aria-current sync,
-  // and fall back to IntersectionObserver in browsers without scroll-target-group.
+  // Scrollspy: native CSS scroll-target-group (:target-current) with aria-current sync,
+  // falling back to IntersectionObserver where scroll-target-group is unsupported.
   const sectionLinks = menu ? [...menu.querySelectorAll('a[href^="#"]')] : [];
   const sections = sectionLinks
     .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
@@ -122,7 +119,6 @@
           link.setAttribute('aria-current', link === currentLink ? 'true' : 'false');
         });
       };
-      // Wait for first layout/paint so :target-current has resolved on initial load.
       requestAnimationFrame(() => requestAnimationFrame(syncAriaCurrent));
       window.addEventListener('load', syncAriaCurrent, { once: true });
       document.addEventListener('scrollend', syncAriaCurrent);
@@ -147,7 +143,6 @@
 
       sections.forEach((section) => sectionObserver.observe(section));
 
-      // Handle clicking links directly and reaching the very bottom of the page
       sectionLinks.forEach((link) => {
         link.addEventListener('click', () => setActiveId(link.getAttribute('href').slice(1)));
       });
@@ -158,6 +153,75 @@
         }
       }, { passive: true });
     }
+  }
+
+  // Interactive figure tabs (selection follows focus; hidden="until-found" syncs with find-in-page)
+  const tablist = document.querySelector('.figure-tablist');
+  if (tablist) {
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+    const panels = tabs
+      .map((tab) => document.querySelector(`[role="tabpanel"][aria-labelledby="${tab.id}"]`))
+      .filter(Boolean);
+    const nativeFocusGroup = Object.hasOwn(HTMLElement.prototype, 'focusGroup');
+
+    const selectTab = (nextTab, { moveFocus = false } = {}) => {
+      tabs.forEach((tab, index) => {
+        const selected = tab === nextTab;
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.toggleAttribute('focusgroupstart', selected);
+        if (!nativeFocusGroup) {
+          tab.tabIndex = selected ? 0 : -1;
+        }
+        const panel = panels[index];
+        if (panel) {
+          if (selected) {
+            panel.removeAttribute('hidden');
+            panel.tabIndex = 0;
+          } else {
+            panel.setAttribute('hidden', 'until-found');
+            panel.removeAttribute('tabindex');
+          }
+        }
+      });
+
+      try {
+        nextTab.scrollIntoView({ block: 'nearest', inline: 'nearest', container: 'nearest' });
+      } catch {
+        nextTab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+
+      if (moveFocus) nextTab.focus({ preventScroll: true });
+    };
+
+    if (!nativeFocusGroup) {
+      tabs.forEach((tab) => {
+        tab.tabIndex = tab.getAttribute('aria-selected') === 'true' ? 0 : -1;
+      });
+      tablist.addEventListener('keydown', (event) => {
+        const current = tabs.indexOf(document.activeElement);
+        if (current < 0) return;
+        let next = -1;
+        if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        if (next >= 0) {
+          event.preventDefault();
+          selectTab(tabs[next], { moveFocus: true });
+        }
+      });
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('focus', () => {
+        if (tab.getAttribute('aria-selected') !== 'true') selectTab(tab);
+      });
+    });
+
+    panels.forEach((panel, index) => {
+      panel.addEventListener('beforematch', () => selectTab(tabs[index]));
+    });
   }
 
   // Support clean URLs (/ and /graph) on web hosts while keeping direct file:// opens working.
@@ -176,8 +240,8 @@
         const count = Array.isArray(parsed?.graphs) ? parsed.graphs.length : 0;
         if (count > 0) {
           metaEl.textContent = count === 1
-            ? '1 saved graph on this device'
-            : count + ' saved graphs on this device';
+            ? '1 saved graph in this browser'
+            : count + ' saved graphs in this browser';
         }
       }
     } catch {
