@@ -104,6 +104,62 @@
   }
   syncNavLayout();
 
+  // Scrollspy: use native CSS scroll-target-group (:target-current) with aria-current sync,
+  // and fall back to IntersectionObserver in browsers without scroll-target-group.
+  const sectionLinks = menu ? [...menu.querySelectorAll('a[href^="#"]')] : [];
+  const sections = sectionLinks
+    .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+    .filter(Boolean);
+
+  if (sectionLinks.length && sections.length) {
+    const supportsScrollTargetGroup =
+      typeof CSS !== 'undefined' && CSS.supports('scroll-target-group: auto');
+
+    if (supportsScrollTargetGroup) {
+      const syncAriaCurrent = () => {
+        const currentLink = menu.querySelector('a:target-current');
+        sectionLinks.forEach((link) => {
+          link.setAttribute('aria-current', link === currentLink ? 'true' : 'false');
+        });
+      };
+      // Wait for first layout/paint so :target-current has resolved on initial load.
+      requestAnimationFrame(() => requestAnimationFrame(syncAriaCurrent));
+      window.addEventListener('load', syncAriaCurrent, { once: true });
+      document.addEventListener('scrollend', syncAriaCurrent);
+      window.addEventListener('hashchange', () => requestAnimationFrame(syncAriaCurrent));
+    } else {
+      const setActiveId = (activeId) => {
+        sectionLinks.forEach((link) => {
+          const isActive = link.getAttribute('href') === '#' + activeId;
+          link.classList.toggle('target-current', isActive);
+          link.setAttribute('aria-current', isActive ? 'true' : 'false');
+        });
+      };
+
+      const initialHash = location.hash.slice(1);
+      setActiveId(sections.some((s) => s.id === initialHash) ? initialHash : sections[0].id);
+
+      const sectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActiveId(entry.target.id);
+        });
+      }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+
+      sections.forEach((section) => sectionObserver.observe(section));
+
+      // Handle clicking links directly and reaching the very bottom of the page
+      sectionLinks.forEach((link) => {
+        link.addEventListener('click', () => setActiveId(link.getAttribute('href').slice(1)));
+      });
+      window.addEventListener('scroll', () => {
+        if (window.scrollY <= 8) setActiveId(sections[0].id);
+        else if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+          setActiveId(sections[sections.length - 1].id);
+        }
+      }, { passive: true });
+    }
+  }
+
   // Read-only summary of saved Kvasir Graph workspace on this device (if any)
   const metaEl = document.getElementById('graph-workspace-meta');
   if (metaEl) {

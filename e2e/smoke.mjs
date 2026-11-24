@@ -41,6 +41,9 @@ test('the landing page loads, adapts its nav, and links to Kvasir Graph', async 
   await page.waitForFunction(() => document.getElementById('site-menu').matches(':popover-open'));
   await page.setViewportSize({width: 1366, height: 800});
   await page.waitForFunction(() => document.querySelector('.site-header').classList.contains('is-wide'));
+  // Scrollspy tracks the active section as you navigate down the page.
+  await page.click('#site-menu a[href="#tools"]');
+  await page.waitForFunction(() => document.querySelector('#site-menu a[href="#tools"]').getAttribute('aria-current') === 'true');
   await page.locator('a.card-link', {hasText: 'Kvasir Graph'}).click();
   await page.waitForSelector('#plot');
   assert.ok((await objects()).includes('Demand'));
