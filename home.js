@@ -160,6 +160,12 @@
     }
   }
 
+  // Support clean URLs (/ and /graph) on web hosts while keeping direct file:// opens working.
+  if (location.protocol === 'file:') {
+    document.querySelectorAll('a[href="/"]').forEach((a) => a.setAttribute('href', 'index.html'));
+    document.querySelectorAll('a[href="/graph"]').forEach((a) => a.setAttribute('href', 'graph.html'));
+  }
+
   // Read-only summary of saved Kvasir Graph workspace on this device (if any)
   const metaEl = document.getElementById('graph-workspace-meta');
   if (metaEl) {
